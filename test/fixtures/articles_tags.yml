@@ -1,0 +1,7 @@
+one:
+  article_id: <%= ActiveRecord::FixtureSet.identify(:one) %>
+  tag_id: <%= ActiveRecord::FixtureSet.identify(:one) %>
+
+two:
+  article_id: <%= ActiveRecord::FixtureSet.identify(:two) %>
+  tag_id: <%= ActiveRecord::FixtureSet.identify(:two) %>

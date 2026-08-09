@@ -1,0 +1,19 @@
+<div class="activity-relationship-flow">
+  <div class="activity-relationship-state before">
+    <span>Before</span>
+    <% if relationship.from %>
+      <%= render "demo/activity_record_snapshot", record: relationship.from, state: :before %>
+    <% else %>
+      <p class="activity-empty-value">No related record</p>
+    <% end %>
+  </div>
+  <span class="activity-relationship-arrow" aria-hidden="true">→</span>
+  <div class="activity-relationship-state after">
+    <span>After</span>
+    <% if relationship.to %>
+      <%= render "demo/activity_record_snapshot", record: relationship.to, state: :after %>
+    <% else %>
+      <p class="activity-empty-value">No related record</p>
+    <% end %>
+  </div>
+</div>

@@ -1,0 +1,9 @@
+one:
+  comment: one
+  responder: Reviewer One
+  body: A nested fixture reply.
+
+two:
+  comment: two
+  responder: Reviewer Two
+  body: Another nested fixture reply.

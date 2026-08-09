@@ -1,0 +1,936 @@
+<% content_for :title, "PaperTrail Diff Lab" %>
+
+<main class="shell">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Local gem playground</p>
+      <h1>PaperTrail <span>Diff Lab</span></h1>
+      <p class="lede">
+        Compare immutable snapshots at two version boundaries, then inspect the
+        same range one transition at a time.
+      </p>
+    </div>
+    <%= button_to "Reset all demo data", reset_demo_path, class: "button button-secondary" %>
+  </header>
+
+  <section class="studio-grid">
+    <div class="panel article-switcher">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Workspace</p>
+          <h2>Articles</h2>
+        </div>
+        <span class="count"><%= @articles.length %></span>
+      </div>
+      <nav class="article-list" aria-label="Demo articles">
+        <% @articles.each do |article| %>
+          <%= link_to root_path(article_id: article.id),
+            class: ["article-link", ("active" if article == @article)] do %>
+            <span><%= article.title %></span>
+            <small><%= article.status.humanize %> · <%= pluralize(article.versions.count, "version") %></small>
+          <% end %>
+        <% end %>
+        <% if @articles.empty? %>
+          <p class="muted">There are no articles yet.</p>
+        <% end %>
+      </nav>
+    </div>
+
+    <details class="panel editor-panel" <%= "open" if @articles.empty? %>>
+      <summary>
+        <span>
+          <span class="eyebrow">Create and version</span>
+          <strong>New article</strong>
+        </span>
+        <span class="summary-action">Open form</span>
+      </summary>
+      <%= form_with model: @new_article, class: "record-form" do |form| %>
+        <label>
+          <span>Title</span>
+          <%= form.text_field :title, required: true, placeholder: "A useful title" %>
+        </label>
+        <label>
+          <span>Status</span>
+          <%= form.select :status,
+            Article::STATUSES.map { |status| [status.humanize, status] } %>
+        </label>
+        <label class="full-field">
+          <span>Body</span>
+          <%= form.text_area :body, required: true, rows: 4, placeholder: "Write the article body…" %>
+        </label>
+        <label>
+          <span>Actor / whodunnit</span>
+          <%= text_field_tag :actor, "Manual tester" %>
+        </label>
+        <%= form.submit "Create article", class: "button" %>
+      <% end %>
+    </details>
+  </section>
+
+  <% unless @article %>
+    <section class="empty-state panel">
+      <p class="eyebrow">No demo data</p>
+      <h2>Create an article above or restore the seeded history.</h2>
+      <%= button_to "Restore seeded history", reset_demo_path, class: "button" %>
+    </section>
+  <% else %>
+    <section class="current-grid">
+      <article class="panel current-record">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Live record</p>
+            <h2><%= @article.title %></h2>
+          </div>
+          <span class="status"><%= @article.status.humanize %></span>
+        </div>
+        <p class="record-body"><%= @article.body %></p>
+        <div class="metadata">
+          <span>Article #<%= @article.id %></span>
+          <span><%= pluralize(@versions.length, "root version") %></span>
+          <span><%= pluralize(@article.comments.count, "current comment") %></span>
+          <span><%= pluralize(@authorships.length, "current author") %></span>
+          <span><%= pluralize(@tags.length, "current tag") %></span>
+        </div>
+
+        <details class="inline-editor">
+          <summary>Edit article and create a checkpoint</summary>
+          <%= form_with model: @article, class: "record-form" do |form| %>
+            <label>
+              <span>Title</span>
+              <%= form.text_field :title, required: true %>
+            </label>
+            <label>
+              <span>Status</span>
+              <%= form.select :status,
+                Article::STATUSES.map { |status| [status.humanize, status] } %>
+            </label>
+            <label class="full-field">
+              <span>Body</span>
+              <%= form.text_area :body, required: true, rows: 5 %>
+            </label>
+            <label>
+              <span>Actor / whodunnit</span>
+              <%= text_field_tag :actor, "Manual tester" %>
+            </label>
+            <%= form.submit "Save article", class: "button" %>
+          <% end %>
+        </details>
+      </article>
+
+      <aside class="panel comments-panel">
+        <p class="eyebrow">Current associations</p>
+        <h2>Comments</h2>
+        <div class="comment-list">
+          <% @article.comments.order(:id).each do |comment| %>
+            <div class="comment">
+              <strong><%= comment.author %></strong>
+              <p><%= comment.body %></p>
+              <div class="reply-list">
+                <% comment.replies.order(:id).each do |reply| %>
+                  <div class="reply">
+                    <strong><%= reply.responder %></strong>
+                    <p><%= reply.body %></p>
+                    <details class="comment-editor">
+                      <summary>Edit or remove reply</summary>
+                      <%= form_with model: [@article, comment, reply], class: "record-form compact-form" do |form| %>
+                        <label>
+                          <span>Responder</span>
+                          <%= form.text_field :responder, required: true %>
+                        </label>
+                        <label>
+                          <span>Reply</span>
+                          <%= form.text_area :body, required: true, rows: 2 %>
+                        </label>
+                        <label>
+                          <span>Actor / whodunnit</span>
+                          <%= text_field_tag :actor, "Manual tester" %>
+                        </label>
+                        <%= form.submit "Save reply", class: "button button-small" %>
+                      <% end %>
+                      <%= button_to "Delete reply",
+                        article_comment_reply_path(@article, comment, reply),
+                        method: :delete,
+                        params: { actor: "Manual tester" },
+                        class: "text-button danger-button" %>
+                    </details>
+                  </div>
+                <% end %>
+              </div>
+              <details class="comment-editor">
+                <summary>Edit or remove</summary>
+                <%= form_with model: [@article, comment], class: "record-form compact-form" do |form| %>
+                  <label>
+                    <span>Author</span>
+                    <%= form.text_field :author, required: true %>
+                  </label>
+                  <label>
+                    <span>Comment</span>
+                    <%= form.text_area :body, required: true, rows: 3 %>
+                  </label>
+                  <label>
+                    <span>Actor / whodunnit</span>
+                    <%= text_field_tag :actor, "Manual tester" %>
+                  </label>
+                  <%= form.submit "Save comment", class: "button button-small" %>
+                <% end %>
+                <%= button_to "Delete comment",
+                  article_comment_path(@article, comment),
+                  method: :delete,
+                  params: { actor: "Manual tester" },
+                  class: "text-button danger-button" %>
+              </details>
+              <details class="comment-editor new-reply-editor">
+                <summary>Add a nested reply</summary>
+                <%= form_with model: [@article, comment, Reply.new], class: "record-form compact-form" do |form| %>
+                  <label>
+                    <span>Responder</span>
+                    <%= form.text_field :responder, required: true, placeholder: "Responder name" %>
+                  </label>
+                  <label>
+                    <span>Reply</span>
+                    <%= form.text_area :body, required: true, rows: 2, placeholder: "Reply to this comment…" %>
+                  </label>
+                  <label>
+                    <span>Actor / whodunnit</span>
+                    <%= text_field_tag :actor, "Manual tester" %>
+                  </label>
+                  <%= form.submit "Add reply", class: "button button-small" %>
+                <% end %>
+              </details>
+            </div>
+          <% end %>
+        </div>
+
+        <details class="inline-editor new-comment-editor">
+          <summary>Add a comment</summary>
+          <%= form_with model: [@article, @new_comment], class: "record-form compact-form" do |form| %>
+            <label>
+              <span>Author</span>
+              <%= form.text_field :author, required: true, placeholder: "Reviewer name" %>
+            </label>
+            <label>
+              <span>Comment</span>
+              <%= form.text_area :body, required: true, rows: 3, placeholder: "Leave feedback…" %>
+            </label>
+            <label>
+              <span>Actor / whodunnit</span>
+              <%= text_field_tag :actor, "Manual tester" %>
+            </label>
+            <%= form.submit "Add comment", class: "button button-small" %>
+          <% end %>
+        </details>
+      </aside>
+    </section>
+
+    <section class="panel authors-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Many-to-many association</p>
+          <h2>Article authors</h2>
+        </div>
+        <code>has_many :authors, through: :authorships</code>
+      </div>
+
+      <div class="authors-layout">
+        <div class="author-list">
+          <% @authorships.each do |authorship| %>
+            <% author = authorship.author %>
+            <article class="author-card">
+              <div class="author-avatar"><%= author.name.split.map { |part| part.first }.join.first(2) %></div>
+              <div class="author-copy">
+                <strong><%= author.name %></strong>
+                <p>
+                  <code><%= authorship.role %></code>
+                  · position <%= authorship.position %>
+                  <% if authorship.credited_as.present? %>
+                    · credited as <%= authorship.credited_as %>
+                  <% end %>
+                </p>
+                <p><%= author.bio %></p>
+                <details class="comment-editor">
+                  <summary>Edit author or detach from this article</summary>
+                  <%= form_with model: author, class: "record-form compact-form" do |form| %>
+                    <%= hidden_field_tag :article_id, @article.id %>
+                    <label>
+                      <span>Name</span>
+                      <%= form.text_field :name, required: true %>
+                    </label>
+                    <label>
+                      <span>Bio</span>
+                      <%= form.text_area :bio, required: true, rows: 3 %>
+                    </label>
+                    <label>
+                      <span>Actor / whodunnit</span>
+                      <%= text_field_tag :actor, "Manual tester" %>
+                    </label>
+                    <%= form.submit "Save author", class: "button button-small" %>
+                  <% end %>
+                  <%= button_to "Detach author",
+                    article_authorship_path(@article, authorship),
+                    method: :delete,
+                    params: { actor: "Manual tester" },
+                    class: "text-button danger-button" %>
+                </details>
+              </div>
+            </article>
+          <% end %>
+          <% if @authorships.empty? %>
+            <p class="muted">No authors are attached to this article.</p>
+          <% end %>
+        </div>
+
+        <div class="author-actions">
+          <details class="inline-editor" open>
+            <summary>Create and attach a new author</summary>
+            <%= form_with model: @new_author, class: "record-form compact-form" do |form| %>
+              <%= hidden_field_tag :article_id, @article.id %>
+              <label>
+                <span>Name</span>
+                <%= form.text_field :name, required: true, placeholder: "Author name" %>
+              </label>
+              <label>
+                <span>Bio</span>
+                <%= form.text_area :bio, required: true, rows: 3, placeholder: "Short biography…" %>
+              </label>
+              <label>
+                <span>Actor / whodunnit</span>
+                <%= text_field_tag :actor, "Manual tester" %>
+              </label>
+              <%= form.submit "Create and attach", class: "button button-small" %>
+            <% end %>
+          </details>
+
+          <% if @available_authors.any? %>
+            <details class="inline-editor">
+              <summary>Attach an existing author</summary>
+              <%= form_with model: [@article, @new_authorship], class: "record-form compact-form" do |form| %>
+                <label>
+                  <span>Author</span>
+                  <%= form.select :author_id,
+                    @available_authors.map { |author| [author.name, author.id] } %>
+                </label>
+                <label>
+                  <span>Role</span>
+                  <%= form.text_field :role, required: true %>
+                </label>
+                <label>
+                  <span>Position</span>
+                  <%= form.number_field :position, required: true, min: 1 %>
+                </label>
+                <label>
+                  <span>Credited as</span>
+                  <%= form.text_field :credited_as, placeholder: "Optional byline" %>
+                </label>
+                <label>
+                  <span>Actor / whodunnit</span>
+                  <%= text_field_tag :actor, "Manual tester" %>
+                </label>
+                <%= form.submit "Attach author", class: "button button-small" %>
+              <% end %>
+            </details>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel authors-panel tags-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Direct many-to-many association</p>
+          <h2>Article tags</h2>
+        </div>
+        <code>has_and_belongs_to_many :tags</code>
+      </div>
+
+      <div class="authors-layout">
+        <div class="author-list">
+          <% @tags.each do |tag| %>
+            <article class="author-card">
+              <div class="author-avatar">#</div>
+              <div class="author-copy">
+                <strong><%= tag.name %></strong>
+                <p><%= tag.description %></p>
+                <details class="comment-editor">
+                  <summary>Edit tag or detach from this article</summary>
+                  <%= form_with model: tag, class: "record-form compact-form" do |form| %>
+                    <%= hidden_field_tag :article_id, @article.id %>
+                    <label>
+                      <span>Name</span>
+                      <%= form.text_field :name, required: true %>
+                    </label>
+                    <label>
+                      <span>Description</span>
+                      <%= form.text_area :description, required: true, rows: 3 %>
+                    </label>
+                    <label>
+                      <span>Actor / whodunnit</span>
+                      <%= text_field_tag :actor, "Manual tester" %>
+                    </label>
+                    <%= form.submit "Save tag", class: "button button-small" %>
+                  <% end %>
+                  <%= button_to "Detach tag",
+                    article_tagging_path(@article, tag),
+                    method: :delete,
+                    params: { actor: "Manual tester" },
+                    class: "text-button danger-button" %>
+                </details>
+              </div>
+            </article>
+          <% end %>
+          <% if @tags.empty? %>
+            <p class="muted">No tags are attached to this article.</p>
+          <% end %>
+        </div>
+
+        <div class="author-actions">
+          <details class="inline-editor" open>
+            <summary>Create and attach a new tag</summary>
+            <%= form_with model: @new_tag, class: "record-form compact-form" do |form| %>
+              <%= hidden_field_tag :article_id, @article.id %>
+              <label>
+                <span>Name</span>
+                <%= form.text_field :name, required: true, placeholder: "Tag name" %>
+              </label>
+              <label>
+                <span>Description</span>
+                <%= form.text_area :description, required: true, rows: 3, placeholder: "What this tag represents…" %>
+              </label>
+              <label>
+                <span>Actor / whodunnit</span>
+                <%= text_field_tag :actor, "Manual tester" %>
+              </label>
+              <%= form.submit "Create and attach", class: "button button-small" %>
+            <% end %>
+          </details>
+
+          <% if @available_tags.any? %>
+            <details class="inline-editor">
+              <summary>Attach an existing tag</summary>
+              <%= form_with url: article_taggings_path(@article), scope: :tagging, class: "record-form compact-form" do |form| %>
+                <label>
+                  <span>Tag</span>
+                  <%= form.select :tag_id, @available_tags.map { |tag| [tag.name, tag.id] } %>
+                </label>
+                <label>
+                  <span>Actor / whodunnit</span>
+                  <%= text_field_tag :actor, "Manual tester" %>
+                </label>
+                <%= form.submit "Attach tag", class: "button button-small" %>
+              <% end %>
+            </details>
+          <% end %>
+        </div>
+      </div>
+    </section>
+
+    <div class="result-workspace">
+    <section class="panel compare-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Endpoint comparison</p>
+          <h2>Choose two snapshots</h2>
+        </div>
+        <code>PaperTrailDiff.compare(from, to)</code>
+      </div>
+
+      <%= form_with url: root_path, method: :get, class: "compare-form" do |form| %>
+        <%= form.hidden_field :article_id, value: @article.id %>
+        <label>
+          <span>From</span>
+          <%= form.select :from_id,
+            @version_options,
+            selected: @from_version&.id %>
+        </label>
+        <div class="arrow" aria-hidden="true">→</div>
+        <label>
+          <span>To</span>
+          <%= form.select :to_id,
+            @to_options,
+            selected: @selected_to_value %>
+        </label>
+        <div class="association-field">
+          <span class="field-label">Associations</span>
+          <%= hidden_field_tag :associations_configured, "1" %>
+          <details class="blacklist-menu">
+            <summary>
+              <span>Choose associations</span>
+              <strong><%= pluralize(@selected_associations.length, "selection") %></strong>
+            </summary>
+            <div class="blacklist-menu-content association-menu-content">
+              <fieldset>
+                <legend>Passed to <code>associations:</code></legend>
+                <p>
+                  Paths are reflected from application models and bounded to
+                  two levels for this demo using the gem's discovery API.
+                  Framework associations and automatic cycles are hidden;
+                  explicit join models remain selectable.
+                </p>
+                <div class="blacklist-options association-options">
+                  <% @association_options.each do |path, description, _model| %>
+                    <label>
+                      <%= check_box_tag "associations[]",
+                        path,
+                        @selected_associations.include?(path),
+                        id: "association_#{path.tr('.', '_')}" %>
+                      <span>
+                        <code><%= path %></code>
+                        <small><%= description %></small>
+                      </span>
+                    </label>
+                  <% end %>
+                </div>
+              </fieldset>
+            </div>
+          </details>
+        </div>
+        <div class="blacklist-field">
+          <span class="field-label">Ignore / blacklist picker</span>
+          <%= hidden_field_tag :blacklist_configured, "1" %>
+          <details class="blacklist-menu">
+            <summary>
+              <span>Choose global or exact-path attributes</span>
+              <strong><%= pluralize(@ignored_attributes.length + @ignored_paths.values.sum(&:length), "selection") %></strong>
+            </summary>
+            <div class="blacklist-menu-content">
+              <fieldset>
+                <legend>Attributes passed to <code>ignore:</code></legend>
+                <p>
+                  Attribute names apply everywhere they occur. For example,
+                  <code>body</code> affects both Article and Comment snapshots.
+                </p>
+                <div class="blacklist-options">
+                  <% @blacklist_attribute_options.each do |name, models| %>
+                    <label>
+                      <%= check_box_tag "ignore[]",
+                        name,
+                        @ignored_attributes.include?(name),
+                        id: "ignore_attribute_#{name}" %>
+                      <span>
+                        <code><%= name %></code>
+                        <small><%= models %></small>
+                      </span>
+                    </label>
+                  <% end %>
+                </div>
+              </fieldset>
+
+              <fieldset class="path-ignore-fieldset">
+                <legend>Exact-path additions to <code>ignore:</code></legend>
+                <p>
+                  These apply only at the named path. Rules for associations
+                  not selected above are discarded before comparison.
+                </p>
+                <div class="path-ignore-groups">
+                  <% @ignore_path_options.each do |path, model, attributes| %>
+                    <% path_id = path == "$" ? "root" : path.tr(".", "_") %>
+                    <details class="path-ignore-group">
+                      <summary>
+                        <code><%= path %></code>
+                        <small><%= model %> · <%= pluralize(@ignored_paths.fetch(path, []).length, "selection") %></small>
+                      </summary>
+                      <div class="blacklist-options">
+                        <% attributes.each do |name| %>
+                          <label>
+                            <%= check_box_tag "ignore_paths[#{path}][]",
+                              name,
+                              @ignored_paths.fetch(path, []).include?(name),
+                              id: "ignore_path_#{path_id}_#{name}" %>
+                            <span><code><%= name %></code></span>
+                          </label>
+                        <% end %>
+                      </div>
+                    </details>
+                  <% end %>
+                </div>
+              </fieldset>
+            </div>
+          </details>
+        </div>
+        <%= form.submit "Compare versions", class: "button" %>
+      <% end %>
+
+      <div class="ignore-summary">
+        <code>ignore: <%= @ignore_option.inspect %></code>
+        <code>associations: <%= @selected_associations.inspect %></code>
+        <span>
+          Global exclusions apply everywhere; exact-path rules add exclusions
+          only at <code>$</code> or a selected association path.
+        </span>
+      </div>
+
+      <% if @diagnostics&.issues&.any? %>
+        <div class="error history-diagnostics">
+          <strong>Historical reconstruction diagnostics</strong>
+          <ul>
+            <% @diagnostics.issues.each do |issue| %>
+              <li><code><%= issue.code %></code> · <%= issue.message %></li>
+            <% end %>
+          </ul>
+        </div>
+      <% end %>
+
+      <% if @comparison_error.present? %>
+        <div class="error"><%= @comparison_error %></div>
+      <% elsif @diff %>
+        <fieldset class="result-view-controls" id="result-views">
+          <legend>Choose a comparison view</legend>
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-endpoint" checked>
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-checkpoints">
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-activity">
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-visible">
+          <div class="result-view-tabs">
+            <label for="result-view-endpoint">
+              <span>Endpoint diff</span>
+              <strong>Net</strong>
+            </label>
+            <label for="result-view-checkpoints">
+              <span>Checkpoints</span>
+              <strong><%= @steps.length %></strong>
+            </label>
+            <label for="result-view-activity">
+              <span>All activity</span>
+              <strong><%= @activity_steps.length %></strong>
+            </label>
+            <label for="result-view-visible">
+              <span>Visible events</span>
+              <strong><%= @visible_activity_steps.length %></strong>
+            </label>
+          </div>
+        </fieldset>
+
+        <div class="result-panel result-panel--endpoint">
+        <% if @diff.record_presence_change %>
+          <%= render "demo/endpoint_presence_change", change: @diff.record_presence_change %>
+        <% end %>
+        <div class="result-summary">
+          <div class="metric">
+            <strong><%= endpoint_attribute_count(@diff) %></strong>
+            <span><%= endpoint_attribute_label(@diff) %></span>
+          </div>
+          <% comments_diff = @diff.associations["comments"] %>
+          <% authors_diff = @diff.associations["authors"] %>
+          <% tags_diff = @diff.associations["tags"] %>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "comments", :added) %></strong>
+            <span>comments added</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "comments", :removed) %></strong>
+            <span>comments removed</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "comments", :changed) %></strong>
+            <span>comments changed</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "authors", :added) %></strong>
+            <span>authors added</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "authors", :removed) %></strong>
+            <span>authors removed</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "authors", :changed) %></strong>
+            <span>authors changed</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "tags", :added) %></strong>
+            <span>tags added</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "tags", :removed) %></strong>
+            <span>tags removed</span>
+          </div>
+          <div class="metric">
+            <strong><%= endpoint_collection_count(@diff, "tags", :changed) %></strong>
+            <span>tags changed</span>
+          </div>
+        </div>
+
+        <div class="diff-layout">
+          <div>
+            <h3>Changed attributes</h3>
+            <% if @diff.record_presence_change %>
+              <p class="muted">
+                Lifecycle attributes are included in the complete record snapshot above;
+                they are not duplicated as scalar changes.
+              </p>
+            <% elsif @diff.attributes.empty? %>
+              <p class="muted">No scalar attributes changed.</p>
+            <% else %>
+              <div class="changes">
+                <% @diff.attributes.each do |name, change| %>
+                  <div class="change-card">
+                    <code><%= name %></code>
+                    <div class="before"><span>Before</span><%= change.from %></div>
+                    <div class="after"><span>After</span><%= change.to %></div>
+                  </div>
+                <% end %>
+              </div>
+            <% end %>
+
+            <% if comments_diff %>
+              <h3 class="association-title">Comment changes</h3>
+              <div class="association-groups">
+                <% comments_diff.changed.each do |change| %>
+                  <div class="association-card changed">
+                    <span class="tag">Changed · Comment #<%= change.record[:id] %></span>
+                    <% change.attributes.each do |name, value_change| %>
+                      <code><%= name %></code>
+                      <p><del><%= value_change.from %></del></p>
+                      <p><ins><%= value_change.to %></ins></p>
+                    <% end %>
+                    <% if change.associations.any? %>
+                      <details class="nested-payload">
+                        <summary>Nested association changes</summary>
+                        <pre><%= JSON.pretty_generate(change.associations.transform_values(&:to_h)) %></pre>
+                      </details>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% comments_diff.added.each do |record| %>
+                  <div class="association-card added">
+                    <span class="tag">Added · Comment #<%= record.id %></span>
+                    <strong><%= record.attributes["author"] %></strong>
+                    <p><%= record.attributes["body"] %></p>
+                    <% if record.associations.any? %>
+                      <details class="nested-payload">
+                        <summary>Selected nested state</summary>
+                        <pre><%= JSON.pretty_generate(record.to_h.fetch(:associations)) %></pre>
+                      </details>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% comments_diff.removed.each do |record| %>
+                  <div class="association-card removed">
+                    <span class="tag">Removed · Comment #<%= record.id %></span>
+                    <strong><%= record.attributes["author"] %></strong>
+                    <p><%= record.attributes["body"] %></p>
+                    <% if record.associations.any? %>
+                      <details class="nested-payload">
+                        <summary>Selected nested state</summary>
+                        <pre><%= JSON.pretty_generate(record.to_h.fetch(:associations)) %></pre>
+                      </details>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% if comments_diff.empty? %>
+                  <p class="muted">No comment changes at these endpoints.</p>
+                <% end %>
+              </div>
+            <% end %>
+
+            <% if authors_diff %>
+              <h3 class="association-title">Author changes</h3>
+              <div class="association-groups">
+                <% authors_diff.changed.each do |change| %>
+                  <div class="association-card changed">
+                    <span class="tag">Changed · Author #<%= change.record[:id] %></span>
+                    <% change.attributes.each do |name, value_change| %>
+                      <code><%= name %></code>
+                      <p><del><%= value_change.from %></del></p>
+                      <p><ins><%= value_change.to %></ins></p>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% authors_diff.added.each do |record| %>
+                  <div class="association-card added">
+                    <span class="tag">Added · Author #<%= record.id %></span>
+                    <strong><%= record.attributes["name"] %></strong>
+                    <p><%= record.attributes["bio"] %></p>
+                  </div>
+                <% end %>
+                <% authors_diff.removed.each do |record| %>
+                  <div class="association-card removed">
+                    <span class="tag">Removed · Author #<%= record.id %></span>
+                    <strong><%= record.attributes["name"] %></strong>
+                    <p><%= record.attributes["bio"] %></p>
+                  </div>
+                <% end %>
+                <% if authors_diff.empty? %>
+                  <p class="muted">No author changes at these endpoints.</p>
+                <% end %>
+              </div>
+            <% end %>
+
+            <% if tags_diff %>
+              <h3 class="association-title">Tag changes (HABTM)</h3>
+              <div class="association-groups">
+                <% tags_diff.changed.each do |change| %>
+                  <div class="association-card changed">
+                    <span class="tag">Changed · Tag #<%= change.record[:id] %></span>
+                    <% change.attributes.each do |name, value_change| %>
+                      <code><%= name %></code>
+                      <p><del><%= value_change.from %></del></p>
+                      <p><ins><%= value_change.to %></ins></p>
+                    <% end %>
+                  </div>
+                <% end %>
+                <% tags_diff.added.each do |record| %>
+                  <div class="association-card added">
+                    <span class="tag">Added · Tag #<%= record.id %></span>
+                    <strong><%= record.attributes["name"] %></strong>
+                    <p><%= record.attributes["description"] %></p>
+                  </div>
+                <% end %>
+                <% tags_diff.removed.each do |record| %>
+                  <div class="association-card removed">
+                    <span class="tag">Removed · Tag #<%= record.id %></span>
+                    <strong><%= record.attributes["name"] %></strong>
+                    <p><%= record.attributes["description"] %></p>
+                  </div>
+                <% end %>
+                <% if tags_diff.empty? %>
+                  <p class="muted">No HABTM tag changes at these endpoints.</p>
+                <% end %>
+              </div>
+            <% end %>
+          </div>
+
+          <details class="payload" open>
+            <summary>Structured Ruby result</summary>
+            <pre><%= JSON.pretty_generate(@diff.to_h) %></pre>
+          </details>
+        </div>
+        </div>
+      <% end %>
+    </section>
+
+    <% if @steps %>
+      <section class="timeline-section result-panel result-panel--checkpoints">
+        <div class="section-heading timeline-heading">
+          <div>
+            <p class="eyebrow">Timeline</p>
+            <h2><%= pluralize(@steps.length, "adjacent transition") %></h2>
+          </div>
+          <code>PaperTrailDiff.timeline(article, from:, to:)</code>
+        </div>
+
+        <div class="timeline">
+          <% @steps.each_with_index do |step, index| %>
+            <article class="timeline-step">
+              <div class="timeline-marker"><%= index + 1 %></div>
+              <details class="panel timeline-card" open>
+                <summary class="step-heading">
+                  <div>
+                    <span><%= activity_boundary_label(step.from_boundary) %></span>
+                    <strong>→</strong>
+                    <span><%= activity_boundary_label(step.to_boundary) %></span>
+                  </div>
+                  <span class="step-status">
+                    <span class="tag"><%= step.empty? ? "Empty after ignores" : "Changes detected" %></span>
+                    <span class="timeline-caret" aria-hidden="true">▾</span>
+                  </span>
+                </summary>
+                <pre><%= JSON.pretty_generate(step.diff.to_h) %></pre>
+              </details>
+            </article>
+          <% end %>
+          <% if @steps.empty? %>
+            <div class="panel empty-step">Equal endpoints produce a frozen empty timeline.</div>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @activity_steps %>
+      <section class="timeline-section activity-timeline-section result-panel result-panel--activity">
+        <div class="section-heading timeline-heading">
+          <div>
+            <p class="eyebrow">Root + descendant activity</p>
+            <h2><%= pluralize(@activity_steps.length, "activity transition") %></h2>
+          </div>
+          <code><%= @activity_api_label %></code>
+        </div>
+
+        <% if @activity_notice %>
+          <div class="timeline-notice"><%= @activity_notice %></div>
+        <% end %>
+
+        <div class="timeline">
+          <% @activity_steps.each_with_index do |step, index| %>
+            <article class="timeline-step activity-step">
+              <div class="timeline-marker"><%= index + 1 %></div>
+              <details class="panel timeline-card activity-card" open>
+                <summary class="step-heading">
+                  <div class="activity-boundary-flow">
+                    <span class="activity-boundary">
+                      <strong><%= activity_boundary_label(step.from_boundary) %></strong>
+                      <small><%= activity_boundary_context(step.from_boundary) %></small>
+                    </span>
+                    <strong>→</strong>
+                    <span class="activity-boundary">
+                      <strong><%= activity_boundary_label(step.to_boundary) %></strong>
+                      <small><%= activity_boundary_context(step.to_boundary) %></small>
+                    </span>
+                  </div>
+                  <span class="step-status">
+                    <span class="tag"><%= activity_diff_summary(step.diff) %></span>
+                    <span class="timeline-caret" aria-hidden="true">▾</span>
+                  </span>
+                </summary>
+                <%= render "demo/activity_diff", diff: step.diff %>
+              </details>
+            </article>
+          <% end %>
+          <% if @activity_steps.empty? %>
+            <div class="panel empty-step">Equal endpoints produce no activity transitions.</div>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @visible_activity_steps %>
+      <section class="timeline-section visible-events-section result-panel result-panel--visible">
+        <div class="section-heading timeline-heading">
+          <div>
+            <p class="eyebrow">Presentation timeline</p>
+            <h2><%= pluralize(@visible_activity_steps.length, "visible event") %></h2>
+          </div>
+          <code>analysis.activity_timeline.reject(&amp;:empty?)</code>
+        </div>
+
+        <p class="visible-events-intro">
+          Empty boundaries are omitted. Each card attributes its changes to the
+          left-hand PaperTrail event whose post-event state appears at the next boundary.
+        </p>
+
+        <% if @activity_notice %>
+          <div class="timeline-notice"><%= @activity_notice %></div>
+        <% end %>
+
+        <div class="timeline">
+          <% @visible_activity_steps.each_with_index do |step, index| %>
+            <% event = step.from_boundary %>
+            <article class="timeline-step visible-event-step">
+              <div class="timeline-marker"><%= index + 1 %></div>
+              <details class="panel timeline-card activity-card visible-event-card" open>
+                <summary class="step-heading">
+                  <div class="visible-event-heading">
+                    <span class="activity-boundary">
+                      <strong><%= activity_record_label(event.record) %></strong>
+                      <small><%= activity_boundary_context(event) %></small>
+                    </span>
+                    <span class="visible-event-capture">
+                      Visible by <%= activity_boundary_label(step.to_boundary) %>
+                    </span>
+                  </div>
+                  <span class="step-status">
+                    <span class="tag"><%= activity_diff_summary(step.diff) %></span>
+                    <span class="timeline-caret" aria-hidden="true">▾</span>
+                  </span>
+                </summary>
+                <%= render "demo/activity_diff", diff: step.diff %>
+              </details>
+            </article>
+          <% end %>
+          <% if @visible_activity_steps.empty? %>
+            <div class="panel empty-step">No visible changes remain after ignores.</div>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+    </div>
+  <% end %>
+</main>

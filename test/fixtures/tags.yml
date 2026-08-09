@@ -1,0 +1,7 @@
+one:
+  name: History
+  description: Historical reporting.
+
+two:
+  name: Reviewed
+  description: Editorially reviewed work.

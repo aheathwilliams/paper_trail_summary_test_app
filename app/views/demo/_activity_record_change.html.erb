@@ -1,0 +1,14 @@
+<article class="activity-record activity-record--changed">
+  <header class="activity-record-heading">
+    <span class="activity-record-state">Changed</span>
+    <strong><%= activity_record_label(change.record) %></strong>
+  </header>
+
+  <%= render "demo/activity_attribute_changes",
+    changes: change.attributes,
+    title: "Changed fields" %>
+
+  <% change.associations.each do |name, association| %>
+    <%= render "demo/activity_association_diff", name: name, association: association, nested: true %>
+  <% end %>
+</article>

@@ -1,0 +1,24 @@
+<% snapshot = change.to || change.from %>
+<% created = change.to.present? %>
+
+<section class="endpoint-presence endpoint-presence--<%= created ? "created" : "removed" %>">
+  <div class="endpoint-presence-heading">
+    <div>
+      <p class="eyebrow">Record lifecycle</p>
+      <h3><%= created ? "Article becomes present" : "Article becomes absent" %></h3>
+    </div>
+    <span class="tag"><%= created ? "Created / included" : "Removed" %></span>
+  </div>
+  <p>
+    <% if created %>
+      The starting boundary has no record. These attributes and requested
+      associations are the complete state included at the ending endpoint.
+    <% else %>
+      The ending boundary has no record. This is the complete state retained
+      from the starting endpoint.
+    <% end %>
+  </p>
+  <%= render "demo/activity_record_snapshot",
+    record: snapshot,
+    state: created ? :added : :removed %>
+</section>

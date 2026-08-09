@@ -1,0 +1,38 @@
+<% counts = activity_change_counts(diff) %>
+
+<div class="activity-change-visual">
+  <% if diff.empty? %>
+    <div class="activity-no-change">
+      <strong>No visible state change</strong>
+      <p>This recorded boundary did not change the selected graph after ignores were applied.</p>
+    </div>
+  <% else %>
+    <div class="activity-overview" aria-label="Change summary">
+      <% DemoHelper::ACTIVITY_COUNT_LABELS.each_key do |kind| %>
+        <% next unless counts.fetch(kind).positive? %>
+        <span class="activity-count activity-count--<%= kind %>">
+          <strong><%= counts.fetch(kind) %></strong>
+          <%= activity_count_label(kind, counts.fetch(kind)) %>
+        </span>
+      <% end %>
+    </div>
+
+    <% if diff.record_presence_change %>
+      <section class="activity-change-section">
+        <div class="activity-change-heading"><h4>Root record state</h4></div>
+        <%= render "demo/activity_relationship_change", relationship: diff.record_presence_change %>
+      </section>
+    <% end %>
+
+    <%= render "demo/activity_attribute_changes", changes: diff.attributes, title: "Article fields" %>
+
+    <% diff.associations.each do |name, association| %>
+      <%= render "demo/activity_association_diff", name: name, association: association %>
+    <% end %>
+  <% end %>
+
+  <details class="activity-raw-result">
+    <summary>View structured result</summary>
+    <pre><%= JSON.pretty_generate(diff.to_h) %></pre>
+  </details>
+</div>

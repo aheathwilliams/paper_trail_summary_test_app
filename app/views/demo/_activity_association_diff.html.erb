@@ -1,0 +1,32 @@
+<% nested = local_assigns.fetch(:nested, false) %>
+
+<section class="activity-change-section activity-association-change <%= "activity-association-change--nested" if nested %>">
+  <div class="activity-change-heading">
+    <h4><%= name.humanize %></h4>
+    <code><%= association.kind %></code>
+  </div>
+
+  <% case association %>
+  <% when PaperTrailDiff::CollectionAssociationDiff %>
+    <div class="activity-record-list">
+      <% association.added.each do |record| %>
+        <%= render "demo/activity_record_snapshot", record: record, state: :added %>
+      <% end %>
+      <% association.removed.each do |record| %>
+        <%= render "demo/activity_record_snapshot", record: record, state: :removed %>
+      <% end %>
+      <% association.changed.each do |change| %>
+        <%= render "demo/activity_record_change", change: change %>
+      <% end %>
+    </div>
+  <% when PaperTrailDiff::ToOneAssociationDiff %>
+    <% if association.relationship %>
+      <%= render "demo/activity_relationship_change", relationship: association.relationship %>
+    <% end %>
+    <% if association.changed %>
+      <div class="activity-record-list">
+        <%= render "demo/activity_record_change", change: association.changed %>
+      </div>
+    <% end %>
+  <% end %>
+</section>

@@ -1,0 +1,23 @@
+<% if changes.any? %>
+  <section class="activity-change-section activity-attribute-changes">
+    <div class="activity-change-heading">
+      <h4><%= title %></h4>
+      <span><%= pluralize(changes.length, "field") %></span>
+    </div>
+    <div class="changes">
+      <% changes.each do |name, change| %>
+        <div class="change-card activity-change-card">
+          <code><%= name %></code>
+          <div class="before">
+            <span>Before</span>
+            <%= activity_value(change.from) %>
+          </div>
+          <div class="after">
+            <span>After</span>
+            <%= activity_value(change.to) %>
+          </div>
+        </div>
+      <% end %>
+    </div>
+  </section>
+<% end %>

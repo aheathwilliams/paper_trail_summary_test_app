@@ -1,0 +1,38 @@
+<% state = local_assigns.fetch(:state, :present) %>
+<% state_labels = { added: "Added", removed: "Removed", before: "Before", after: "After", present: "Included" } %>
+
+<article class="activity-record activity-record--<%= state %>">
+  <header class="activity-record-heading">
+    <span class="activity-record-state"><%= state_labels.fetch(state) %></span>
+    <strong><%= activity_record_label(record) %></strong>
+  </header>
+
+  <% if record.attributes.any? %>
+    <dl class="activity-snapshot-attributes">
+      <% record.attributes.each do |name, value| %>
+        <div>
+          <dt><%= name.humanize %></dt>
+          <dd><%= activity_value(value) %></dd>
+        </div>
+      <% end %>
+    </dl>
+  <% end %>
+
+  <% record.associations.each do |name, association| %>
+    <div class="activity-included-association">
+      <div class="activity-included-heading">
+        <strong><%= name.humanize %></strong>
+        <code><%= association.kind %></code>
+        <span><%= pluralize(association.records.length, "record") %></span>
+      </div>
+      <div class="activity-record-list">
+        <% association.records.each do |child| %>
+          <%= render "demo/activity_record_snapshot", record: child, state: :present %>
+        <% end %>
+        <% if association.records.empty? %>
+          <p class="muted">No related record at this boundary.</p>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</article>
