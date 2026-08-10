@@ -121,12 +121,21 @@ After a new gem release, update the locked package and restart the Rails server:
 mise exec -- bundle update paper_trail_diff
 ```
 
-To exercise unpublished changes instead, temporarily use the neighboring
-working tree in the Gemfile:
+To exercise unpublished changes instead, use `Gemfile.local`, which is this
+Gemfile with the gem sourced from the neighbouring working tree. It leaves the
+pinned release in place, so both can be run without editing either file:
 
-```ruby
-gem "paper_trail_diff", path: "../paper_trail_summary"
+```console
+mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle install
+mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle exec rails test
+mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle exec rails server
 ```
+
+The pinned release and the working tree can be compared directly by running the
+same script under each bundle. This is worth doing before a release, because
+the seeded demo history is far too small to expose scaling behaviour: growing
+one article to a few thousand versions separates the two clearly, while the
+default 31-version dataset shows almost no difference.
 
 ## Verify it
 

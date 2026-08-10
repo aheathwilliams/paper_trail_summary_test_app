@@ -17,3 +17,5 @@
 /public/assets
 /config/master.key
 /.byebug_history
+
+/Gemfile.local.lock
