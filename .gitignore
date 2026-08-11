@@ -19,3 +19,6 @@
 /.byebug_history
 
 /Gemfile.local.lock
+
+# Agent worktrees are local scratch, not part of the demo.
+.claude/worktrees/
