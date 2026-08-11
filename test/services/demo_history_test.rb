@@ -5,6 +5,13 @@ class DemoHistoryTest < ActiveSupport::TestCase
     article = DemoHistory.create!
     versions = article.versions.where(event: "update").order(:id).to_a
 
+    # Anchor on the edit each version records rather than its position, so
+    # adding a version to the demo history does not silently re-point these
+    # comparisons at a different span.
+    first_revision = version_setting(versions, "title", "Apollo Notes — First Revision")
+    fact_check = version_setting(versions, "status", "fact_check")
+    approved = version_setting(versions, "status", "approved")
+
     endpoint_diff = PaperTrailDiff.compare(
       versions.first,
       versions.last,
@@ -15,7 +22,6 @@ class DemoHistoryTest < ActiveSupport::TestCase
     tags = endpoint_diff.associations.fetch("tags")
     replies = comments.changed.first.associations.fetch("replies")
 
-    assert_equal 7, versions.length
     assert_equal %w[body status title], endpoint_diff.attributes.keys
     assert_equal 1, comments.added.length
     assert_equal 1, comments.changed.length
@@ -30,8 +36,8 @@ class DemoHistoryTest < ActiveSupport::TestCase
     assert_equal 1, replies.changed.length
 
     author_edit_diff = PaperTrailDiff.compare(
-      versions.second,
-      versions.third,
+      first_revision,
+      fact_check,
       associations: [ :authors ]
     ).associations.fetch("authors")
 
@@ -39,8 +45,8 @@ class DemoHistoryTest < ActiveSupport::TestCase
     assert_equal 1, author_edit_diff.changed.length
 
     ignored_author_edit = PaperTrailDiff.compare(
-      versions.second,
-      versions.third,
+      first_revision,
+      fact_check,
       associations: [ :authors ],
       ignore: [ :bio, :updated_at ]
     ).associations.fetch("authors")
@@ -67,8 +73,8 @@ class DemoHistoryTest < ActiveSupport::TestCase
     assert_equal 1, path_replies.removed.length
 
     membership_diff = PaperTrailDiff.compare(
-      versions.third,
-      versions.fourth,
+      fact_check,
+      approved,
       associations: [ :comments ]
     ).associations.fetch("comments")
 
@@ -81,10 +87,11 @@ class DemoHistoryTest < ActiveSupport::TestCase
       to: versions.last,
       associations: [ :comments ]
     )
-    assert_equal 6, steps.length
+    # Every version in this span is an update, so each adjacent pair is a step.
+    assert_equal versions.length - 1, steps.length
 
     join_diff = PaperTrailDiff.compare(
-      versions.third,
+      fact_check,
       versions.last,
       associations: [ "authorships.author" ]
     ).associations.fetch("authorships")
@@ -94,5 +101,15 @@ class DemoHistoryTest < ActiveSupport::TestCase
 
     assert_equal "L. Ortega", credited.attributes.fetch("credited_as").to
     assert_equal "co-lead", credited.attributes.fetch("role").to
+  end
+
+  private
+
+  # The version recording the edit that set `attribute` to `value`. A version
+  # stores the state before its own event, so the edit shows up in the
+  # changeset of the version the edit created.
+  def version_setting(versions, attribute, value)
+    versions.find { |version| version.changeset[attribute]&.last == value } ||
+      raise("no demo version sets #{attribute} to #{value.inspect}")
   end
 end

@@ -448,6 +448,17 @@
             @to_options,
             selected: @selected_to_value %>
         </label>
+        <label class="author-filter">
+          <span>Changes by</span>
+          <%= form.select :whodunnit,
+            options_for_select(@author_options, @selected_author),
+            { include_blank: "Everyone" } %>
+          <small>
+            Passed to <code>version_scope:</code>. Picking a person reports only
+            their edits, each one bounded by the version that immediately
+            followed it, so its diff is exactly what they changed.
+          </small>
+        </label>
         <div class="association-field">
           <span class="field-label">Associations</span>
           <%= hidden_field_tag :associations_configured, "1" %>
@@ -578,6 +589,7 @@
           <input class="result-view-input" type="radio" name="result-view" id="result-view-checkpoints">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-activity">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-visible">
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-narratives">
           <div class="result-view-tabs">
             <label for="result-view-endpoint">
               <span>Endpoint diff</span>
@@ -594,6 +606,10 @@
             <label for="result-view-visible">
               <span>Visible events</span>
               <strong><%= @visible_activity_steps.length %></strong>
+            </label>
+            <label for="result-view-narratives">
+              <span>Narratives</span>
+              <strong><%= @narrative_events.length %></strong>
             </label>
           </div>
         </fieldset>
@@ -802,9 +818,24 @@
         <div class="section-heading timeline-heading">
           <div>
             <p class="eyebrow">Timeline</p>
-            <h2><%= pluralize(@steps.length, "adjacent transition") %></h2>
+            <h2>
+              <%= pluralize(@steps.length, "adjacent transition") %>
+              <% if @selected_author %>
+                <span class="filter-note">by <%= @selected_author %></span>
+              <% end %>
+            </h2>
+            <% if @selected_author %>
+              <p class="filter-explainer">
+                Each transition ends at the version that immediately followed
+                the edit, which is the only place the state it produced is
+                recorded. Versions by anyone else are still read to reconstruct
+                state; none of their changes are attributed here.
+              </p>
+            <% end %>
           </div>
-          <code>PaperTrailDiff.timeline(article, from:, to:)</code>
+          <code>
+            PaperTrailDiff.timeline(article, from:, to:<%= ", version_scope:" if @selected_author %>)
+          </code>
         </div>
 
         <div class="timeline">
@@ -927,6 +958,67 @@
           <% end %>
           <% if @visible_activity_steps.empty? %>
             <div class="panel empty-step">No visible changes remain after ignores.</div>
+          <% end %>
+        </div>
+      </section>
+    <% end %>
+
+    <% if @narrative_events %>
+      <section class="timeline-section narrative-section result-panel result-panel--narratives">
+        <div class="section-heading timeline-heading">
+          <div>
+            <p class="eyebrow">Humanized activity</p>
+            <h2><%= pluralize(@narrative_events.length, "narrative event") %></h2>
+          </div>
+          <code>step.diff.each_change</code>
+        </div>
+
+        <p class="visible-events-intro">
+          Domain-aware sentences turn the gem's structured change stream into a
+          presentation feed. Duplicate records reached through multiple paths are shown once.
+        </p>
+
+        <% if @activity_notice %>
+          <div class="timeline-notice"><%= @activity_notice %></div>
+        <% end %>
+
+        <div class="timeline narrative-timeline">
+          <% @narrative_events.each_with_index do |event, index| %>
+            <article class="timeline-step narrative-event-step">
+              <div class="timeline-marker"><%= index + 1 %></div>
+              <div class="panel narrative-card">
+                <header class="narrative-card-heading">
+                  <span class="activity-boundary">
+                    <strong><%= activity_record_label(event.boundary.record) %></strong>
+                    <small><%= activity_boundary_context(event.boundary) %></small>
+                  </span>
+                  <span class="visible-event-capture">
+                    Visible by <%= activity_boundary_label(event.visible_by) %>
+                  </span>
+                </header>
+
+                <div class="narrative-items">
+                  <% event.items.each do |item| %>
+                    <section class="narrative-item narrative-item--<%= item.kind %>">
+                      <p class="narrative-sentence"><%= narrative_sentence(item.sentence) %></p>
+                      <% if item.details.any? %>
+                        <div class="narrative-details narrative-details--<%= item.details.length %>">
+                          <% item.details.each do |detail| %>
+                            <blockquote class="narrative-detail narrative-detail--<%= detail.tone %>">
+                              <small><%= narrative_sentence(detail.label) %></small>
+                              <%= simple_format(detail.body.to_s) %>
+                            </blockquote>
+                          <% end %>
+                        </div>
+                      <% end %>
+                    </section>
+                  <% end %>
+                </div>
+              </div>
+            </article>
+          <% end %>
+          <% if @narrative_events.empty? %>
+            <div class="panel empty-step">No changes remain to narrate after ignores.</div>
           <% end %>
         </div>
       </section>

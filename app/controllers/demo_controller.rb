@@ -43,6 +43,8 @@ class DemoController < ApplicationController
     @selected_to_value = current_endpoint? ? CURRENT_ENDPOINT : @to_endpoint.id
     @association_options = association_options
     @selected_associations = selected_associations
+    @author_options = author_options
+    @selected_author = selected_author_filter
     @ignored_attributes = configured_ignored_attributes
     @ignored_paths = configured_ignored_paths
     @ignore_option = configured_ignore_option
@@ -98,13 +100,17 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: @to_endpoint,
-      **comparison_options,
+      **scoped_options,
       activity: true
     )
     @diff = analysis.diff
     @steps = analysis.timeline
     assign_activity_steps(analysis.activity_timeline)
-    @activity_api_label = "PaperTrailDiff.analyze(..., activity: true)"
+    @activity_api_label = if @selected_author
+      "PaperTrailDiff.analyze(..., activity: true, version_scope: ...)"
+    else
+      "PaperTrailDiff.analyze(..., activity: true)"
+    end
     @diagnostics = PaperTrailDiff.diagnose(
       @from_version,
       @to_endpoint,
@@ -119,7 +125,7 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: latest_version,
-      **comparison_options
+      **scoped_options
     )
     assign_current_activity_steps(latest_version)
     @diagnostics = PaperTrailDiff.diagnose(
@@ -134,7 +140,7 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: @article,
-      **comparison_options
+      **scoped_options
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: article)"
@@ -143,7 +149,7 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: latest_version,
-      **comparison_options
+      **scoped_options
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
@@ -157,10 +163,39 @@ class DemoController < ApplicationController
   def assign_activity_steps(steps)
     @activity_steps = steps
     @visible_activity_steps = steps.reject(&:empty?)
+    @narrative_events = NarrativeTimeline.new(@visible_activity_steps).call
   end
 
   def comparison_options
     { associations: @selected_associations, ignore: @ignore_option }
+  end
+
+  # `compare` diffs two endpoints you named yourself, so a filter cannot change
+  # its answer and it does not accept one. Only the range-selecting calls take
+  # the hook.
+  def scoped_options
+    return comparison_options unless @selected_author
+
+    comparison_options.merge(version_scope: author_version_scope)
+  end
+
+  # The "changes made by one person" report. The hook receives the version
+  # relation the range selected and returns a narrowed one, so the filtering
+  # happens in SQL rather than over reified snapshots.
+  def author_version_scope
+    author = @selected_author
+    ->(scope) { scope.where(whodunnit: author) }
+  end
+
+  def author_options
+    @versions.filter_map(&:whodunnit).uniq.sort
+  end
+
+  def selected_author_filter
+    requested = params[:whodunnit]
+    return if requested.blank?
+
+    @author_options.include?(requested) ? requested : nil
   end
 
   def current_endpoint?

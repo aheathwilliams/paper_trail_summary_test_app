@@ -6,18 +6,24 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
   end
 
   test "renders the interactive diff lab" do
+    # The lab defaults to the first update version through current state, so
+    # every later root version contributes one checkpoint step. Deriving the
+    # count keeps this test describing the view rather than the fixture's size.
+    expected_steps = @article.versions.where(event: "update").count - 1
+
     get root_url
 
     assert_response :success
     assert_select "h1", text: /PaperTrail/
     assert_select ".metric", count: 10
-    assert_select ".result-view-tabs label", count: 4
+    assert_select ".result-view-tabs label", count: 5
+    assert_select "label[for='result-view-narratives']", text: /Narratives/
     assert_select "#result-view-endpoint[checked]"
     assert_select "#to_id option[value='current'][selected]"
-    assert_select ".result-panel", count: 4
-    assert_select ".result-panel--checkpoints .timeline-step", count: 6
-    assert_select "details.timeline-card:not(.activity-card)", count: 6
-    assert_select "details.timeline-card:not(.activity-card)[open]", count: 6
+    assert_select ".result-panel", count: 5
+    assert_select ".result-panel--checkpoints .timeline-step", count: expected_steps
+    assert_select "details.timeline-card:not(.activity-card)", count: expected_steps
+    assert_select "details.timeline-card:not(.activity-card)[open]", count: expected_steps
     assert_select ".activity-timeline-section", count: 1
     assert_select ".activity-step.timeline-step"
     assert_select "details.activity-card.timeline-card[open]"
@@ -31,6 +37,11 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select ".result-panel--visible .visible-event-card"
     assert_select ".result-panel--visible .activity-no-change", count: 0
     assert_select ".visible-events-section code", text: /reject\(&:empty\?\)/
+    assert_select ".result-panel--narratives .narrative-event-step"
+    assert_select ".narrative-sentence", text: /changed the status from draft to review/i
+    assert_select ".narrative-sentence", text: /Luis Ortega replied to Jon Bell/
+    assert_select ".narrative-detail--context", text: /The new opening works well/
+    assert_select ".narrative-detail--added", text: /mission acronym is defined/
     assert_select "#ignore_attribute_bio"
     assert_select "#association_authors"
     assert_select "#association_comments"
@@ -147,6 +158,44 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select "#ignore_path_comments_replies_body[checked]"
     assert_select ".ignore-summary code", text: /comments\.replies.*body/
     assert_select ".payload pre", text: /"kind": "has_many"/
+  end
+
+  test "reports only one person's edits when a version scope is chosen" do
+    versions = @article.versions.order(:id)
+    params = {
+      article_id: @article.id,
+      from_id: versions.first.id,
+      to_id: versions.last.id
+    }
+
+    get root_url, params: params
+    assert_response :success
+    everyone = css_select(".result-panel--checkpoints .timeline-step").length
+
+    get root_url, params: params.merge(whodunnit: "Jon Bell")
+    assert_response :success
+    just_jon = css_select(".result-panel--checkpoints .timeline-step").length
+
+    assert_select ".author-filter option[selected]", text: "Jon Bell"
+    assert_select ".result-panel--checkpoints .filter-note", text: /Jon Bell/
+    assert_operator just_jon, :<, everyone
+    assert_operator just_jon, :>, 0
+  end
+
+  test "attributes a filtered transition to what that person actually changed" do
+    # Maya Chen renames the article, and someone else edits it afterwards. The
+    # transition reported for Maya must end at the version immediately after
+    # her edit, not at the next edit of her own, or it would show her making
+    # the other person's change too.
+    scope = ->(relation) { relation.where(whodunnit: "Maya Chen") }
+    steps = PaperTrailDiff.timeline(@article, from: :first, to: :last, version_scope: scope)
+
+    assert_predicate steps, :any?
+    steps.each do |step|
+      assert_equal "Maya Chen", step.from_version.whodunnit
+      following = @article.versions.where("id > ?", step.from_version.id).order(:id).first
+      assert_equal following.id, step.to_version.id
+    end
   end
 
   test "regenerates the demo history" do

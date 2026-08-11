@@ -156,6 +156,19 @@ class DemoHistory
         )
       end
 
+      # Three people edit the root in a row, which is what makes a per-person
+      # report worth filtering. Each transition is bounded by the version that
+      # immediately followed it, because a version stores the state before its
+      # own event, so that next version is the only record of what the edit
+      # produced. Bounding by the same person's *next* edit instead would credit
+      # them with everything the others did in between.
+      as("Priya Shah") do
+        article.update!(body: "An account of Apollo, held for a final copy pass.")
+      end
+      as("Jon Bell") do
+        article.update!(body: "An account of Apollo, with its sources checked.")
+      end
+
       as("Maya Chen") do
         article.update!(
           body: "A polished account of Apollo, its launch, and its lasting cultural impact."

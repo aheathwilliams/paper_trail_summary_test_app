@@ -62,6 +62,18 @@ module DemoHelper
     boundary.recorded_at.strftime("%b %-d, %Y · %-I:%M:%S %p UTC")
   end
 
+  def narrative_sentence(sentence)
+    segments = sentence.to_s.split(/(`[^`]*`)/).map do |segment|
+      if segment.start_with?("`") && segment.end_with?("`")
+        content_tag(:code, segment[1...-1])
+      else
+        segment
+      end
+    end
+
+    safe_join(segments)
+  end
+
   def endpoint_attribute_count(diff)
     snapshot = endpoint_presence_snapshot(diff)
     snapshot ? snapshot.attributes.length : diff.attributes.length

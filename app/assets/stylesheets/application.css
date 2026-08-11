@@ -1049,7 +1049,7 @@ pre {
 
 .result-view-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
   padding: 6px;
   border: 1px solid var(--line);
@@ -1101,14 +1101,16 @@ pre {
 .result-workspace:has(#result-view-endpoint:checked) .result-panel--endpoint,
 .result-workspace:has(#result-view-checkpoints:checked) .result-panel--checkpoints,
 .result-workspace:has(#result-view-activity:checked) .result-panel--activity,
-.result-workspace:has(#result-view-visible:checked) .result-panel--visible {
+.result-workspace:has(#result-view-visible:checked) .result-panel--visible,
+.result-workspace:has(#result-view-narratives:checked) .result-panel--narratives {
   display: block;
 }
 
 .result-workspace:has(#result-view-endpoint:checked) label[for="result-view-endpoint"],
 .result-workspace:has(#result-view-checkpoints:checked) label[for="result-view-checkpoints"],
 .result-workspace:has(#result-view-activity:checked) label[for="result-view-activity"],
-.result-workspace:has(#result-view-visible:checked) label[for="result-view-visible"] {
+.result-workspace:has(#result-view-visible:checked) label[for="result-view-visible"],
+.result-workspace:has(#result-view-narratives:checked) label[for="result-view-narratives"] {
   border-color: var(--line);
   color: var(--blue);
   background: var(--panel);
@@ -1118,7 +1120,8 @@ pre {
 .result-workspace:has(#result-view-endpoint:focus-visible) label[for="result-view-endpoint"],
 .result-workspace:has(#result-view-checkpoints:focus-visible) label[for="result-view-checkpoints"],
 .result-workspace:has(#result-view-activity:focus-visible) label[for="result-view-activity"],
-.result-workspace:has(#result-view-visible:focus-visible) label[for="result-view-visible"] {
+.result-workspace:has(#result-view-visible:focus-visible) label[for="result-view-visible"],
+.result-workspace:has(#result-view-narratives:focus-visible) label[for="result-view-narratives"] {
   outline: 3px solid rgba(19, 67, 84, 0.24);
   outline-offset: 2px;
 }
@@ -1273,6 +1276,123 @@ pre {
   background: #eeebe3;
   font-size: 0.62rem;
   font-weight: 650;
+}
+
+.narrative-card {
+  overflow: hidden;
+}
+
+.narrative-card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--line);
+  background: #f6f3eb;
+}
+
+.narrative-items {
+  display: grid;
+}
+
+.narrative-item {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  border-left: 4px solid var(--blue);
+  background: #fbfaf6;
+}
+
+.narrative-item + .narrative-item {
+  border-top: 1px solid var(--line);
+}
+
+.narrative-item--comment_added,
+.narrative-item--reply_added,
+.narrative-item--author_added,
+.narrative-item--authorship_added,
+.narrative-item--tag_added,
+.narrative-item--article_created {
+  border-left-color: var(--green);
+}
+
+.narrative-item--comment_removed,
+.narrative-item--reply_removed,
+.narrative-item--author_removed,
+.narrative-item--authorship_removed,
+.narrative-item--tag_removed,
+.narrative-item--article_removed {
+  border-left-color: var(--red);
+}
+
+.narrative-sentence {
+  margin: 0;
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.08rem;
+  line-height: 1.45;
+}
+
+.narrative-sentence code,
+.narrative-detail small code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: var(--blue);
+  background: #e9e5da;
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 0.76em;
+}
+
+.narrative-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.narrative-detail {
+  min-width: 0;
+  margin: 0;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-left: 3px solid #9ca4a5;
+  border-radius: 8px;
+  background: #f1eee6;
+}
+
+.narrative-detail--after,
+.narrative-detail--added {
+  border-left-color: var(--green);
+  background: rgba(24, 121, 95, 0.06);
+}
+
+.narrative-detail--before,
+.narrative-detail--removed {
+  border-left-color: var(--red);
+  background: rgba(190, 58, 48, 0.05);
+}
+
+.narrative-detail--context {
+  border-left-color: var(--accent);
+  background: rgba(224, 77, 44, 0.05);
+}
+
+.narrative-detail small {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.narrative-detail p {
+  margin: 0;
+  color: #3e4a50;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
 }
 
 .activity-card .step-status .tag {
@@ -1652,6 +1772,7 @@ pre {
   .section-heading,
   .timeline-heading,
   .endpoint-presence-heading,
+  .narrative-card-heading,
   .step-heading {
     align-items: flex-start;
     flex-direction: column;
