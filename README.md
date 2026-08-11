@@ -4,7 +4,7 @@ A small Rails application for exercising the published `paper_trail_diff`
 package in a realistic integration. Its Gemfile uses:
 
 ```ruby
-gem "paper_trail_diff", "~> 0.2.0"
+gem "paper_trail_diff", "~> 0.4.0"
 ```
 
 The demo creates an article history with scalar, nested, through-association,
