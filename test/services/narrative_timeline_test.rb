@@ -13,7 +13,8 @@ class NarrativeTimelineTest < ActiveSupport::TestCase
         authors authors.authorships authorships authorships.author
         comments comments.replies tags
       ],
-      ignore: [ "updated_at" ]
+      ignore: [ "updated_at" ],
+      snapshots: true
     )
   end
 

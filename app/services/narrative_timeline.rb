@@ -1,17 +1,21 @@
+# Turns activity steps into sentences. Build the steps with `snapshots: true`:
+# naming *whose* comment changed needs the record's unchanged fields, which a
+# diff does not carry.
 class NarrativeTimeline
+  MissingSnapshot = Class.new(StandardError)
+
   Detail = Data.define(:label, :body, :tone)
   Item = Data.define(:kind, :sentence, :details)
   Event = Data.define(:boundary, :visible_by, :items)
 
   def initialize(steps)
     @steps = steps
-    @record_cache = {}
   end
 
   def call
     @steps.filter_map do |step|
       entries = narrative_entries(step.diff)
-      items = entries.filter_map { |entry| item_for(entry, step.from_boundary, entries) }
+      items = entries.filter_map { |entry| item_for(entry, step, entries) }
       next if items.empty?
 
       Event.new(
@@ -37,20 +41,20 @@ class NarrativeTimeline
     [ entry.kind, record&.type, record&.id, entry.attribute, value ]
   end
 
-  def item_for(entry, boundary, entries)
+  def item_for(entry, step, entries)
     return if duplicate_authorship_membership?(entry, entries)
 
     case entry.kind
     when :attribute_changed
-      attribute_item(entry, boundary)
+      attribute_item(entry, step)
     when :record_added
-      membership_item(entry, boundary, :added)
+      membership_item(entry, step, :added)
     when :record_removed
-      membership_item(entry, boundary, :removed)
+      membership_item(entry, step, :removed)
     when :record_presence_changed
-      presence_item(entry, boundary)
+      presence_item(entry, step.from_boundary)
     when :relationship_added, :relationship_removed, :relationship_replaced
-      relationship_item(entry, boundary)
+      relationship_item(entry, step.from_boundary)
     end
   end
 
@@ -63,11 +67,12 @@ class NarrativeTimeline
     end
   end
 
-  def attribute_item(entry, boundary)
+  def attribute_item(entry, step)
+    boundary = step.from_boundary
     change = entry.value
     actor = actor_name(boundary)
     type = entry.record&.type || boundary.item_type
-    record = record_at(entry.record, boundary)
+    record = record_in(step.from_snapshot, entry.association_path, entry.record_path)
 
     case type
     when "Article"
@@ -75,7 +80,7 @@ class NarrativeTimeline
     when "Comment"
       comment_attribute_item(entry, change, actor, record)
     when "Reply"
-      reply_attribute_item(entry, change, actor, record, boundary)
+      reply_attribute_item(entry, change, actor, record, step)
     when "Author"
       author_attribute_item(entry.attribute, change, actor, record)
     when "Authorship"
@@ -103,7 +108,7 @@ class NarrativeTimeline
   end
 
   def comment_attribute_item(entry, change, actor, record)
-    author = record&.author.presence || "an unknown commenter"
+    author = attribute_of(record, "author") || "an unknown commenter"
     action = actor == author ? "edited their comment" : "edited the comment by #{author}"
     sentence = if entry.attribute == "body"
       "#{actor} #{action}."
@@ -114,20 +119,21 @@ class NarrativeTimeline
     item(:comment_changed, sentence, change_details(entry.attribute, change))
   end
 
-  def reply_attribute_item(entry, change, actor, record, boundary)
-    responder = record&.responder.presence || "an unknown responder"
-    parent = parent_comment(entry, boundary)
-    recipient = parent&.author.presence || "the commenter"
+  def reply_attribute_item(entry, change, actor, record, step)
+    responder = attribute_of(record, "responder") || "an unknown responder"
+    parent = parent_comment(entry, step)
+    recipient = attribute_of(parent, "author") || "the commenter"
     action = actor == responder ? "their reply" : "the reply by #{responder}"
+    parent_body = attribute_of(parent, "body")
     details = []
-    details << detail("#{recipient}'s comment", parent.body, :context) if parent&.body.present?
+    details << detail("#{recipient}'s comment", parent_body, :context) if parent_body
     details.concat(change_details(entry.attribute, change))
 
     item(:reply_changed, "#{actor} edited #{action} to #{recipient}.", details)
   end
 
   def author_attribute_item(attribute, change, actor, record)
-    name = record&.name.presence || "an author"
+    name = attribute_of(record, "name") || "an author"
     subject = actor == name ? "their author profile" : "#{name}'s author profile"
     sentence = if attribute == "bio"
       "#{actor} updated #{subject}."
@@ -139,15 +145,15 @@ class NarrativeTimeline
   end
 
   def authorship_attribute_item(attribute, change, actor, record)
-    author = record&.author
-    name = author&.name.presence || "an author"
+    author = record&.associations&.[]("author")&.records&.first
+    name = attribute_of(author, "name") || "an author"
     sentence = "#{actor} changed #{name}'s `#{attribute.humanize.downcase}` credit " \
       "from `#{change.from}` to `#{change.to}`."
     item(:authorship_changed, sentence)
   end
 
   def tag_attribute_item(attribute, change, actor, record)
-    name = record&.name.presence || "an unnamed tag"
+    name = attribute_of(record, "name") || "an unnamed tag"
     sentence = "#{actor} changed `#{attribute.humanize.downcase}` on the `#{name}` tag."
     item(:tag_changed, sentence, change_details(attribute, change))
   end
@@ -157,7 +163,8 @@ class NarrativeTimeline
     item(:attribute_changed, sentence, change_details(attribute, change))
   end
 
-  def membership_item(entry, boundary, state)
+  def membership_item(entry, step, state)
+    boundary = step.from_boundary
     snapshot = entry.value
     actor = actor_name(boundary)
 
@@ -165,7 +172,7 @@ class NarrativeTimeline
     when "Comment"
       comment_membership_item(snapshot, actor, state)
     when "Reply"
-      reply_membership_item(entry, snapshot, actor, state, boundary)
+      reply_membership_item(entry, snapshot, actor, state, step)
     when "Author"
       author_membership_item(snapshot, actor, state)
     when "Authorship"
@@ -193,12 +200,13 @@ class NarrativeTimeline
     item("comment_#{state}".to_sym, sentence, [ detail(label, body, tone) ])
   end
 
-  def reply_membership_item(entry, snapshot, actor, state, boundary)
+  def reply_membership_item(entry, snapshot, actor, state, step)
     responder = snapshot.attributes["responder"].presence || actor
-    parent = parent_comment(entry, boundary)
-    recipient = parent&.author.presence || "the commenter"
+    parent = parent_comment(entry, step)
+    recipient = attribute_of(parent, "author") || "the commenter"
+    parent_body = attribute_of(parent, "body")
     details = []
-    details << detail("#{recipient}'s comment", parent.body, :context) if parent&.body.present?
+    details << detail("#{recipient}'s comment", parent_body, :context) if parent_body
     label = state == :added ? "#{responder}'s reply" : "Removed reply by #{responder}"
     tone = state == :added ? :added : :removed
     details << detail(label, snapshot.attributes["body"], tone)
@@ -275,33 +283,37 @@ class NarrativeTimeline
     item(entry.kind, "#{actor} #{action} the article's #{association} relationship.")
   end
 
-  def parent_comment(entry, boundary)
-    reference = entry.record_path.reverse.find { |record| record.type == "Comment" }
-    record_at(reference, boundary)
+  def parent_comment(entry, step)
+    depth = entry.record_path.rindex { |record| record.type == "Comment" }
+    return unless depth
+
+    record_in(step.from_snapshot, entry.association_path.first(depth + 1), entry.record_path)
   end
 
-  def record_at(reference, boundary)
-    return unless reference
+  # Walks the reconstructed state the gem already built for this boundary. The
+  # snapshot is the root record with its selected associations nested inside, so
+  # following the entry's association path lands on the record that changed --
+  # no version queries, and no reimplementation of boundary semantics.
+  def record_in(snapshot, association_path, record_path)
+    if snapshot.nil? && association_path.any?
+      # A nested record changed, so the root existed and its state should be
+      # here. Missing means the steps were built without `snapshots: true`, and
+      # degrading to "an unknown commenter" would hide that.
+      raise MissingSnapshot, "activity steps must be built with snapshots: true"
+    end
 
-    key = [ reference.type, reference.id, boundary.version_id || :current ]
-    @record_cache[key] ||= begin
-      model = reference.type.safe_constantize
-      if model && model < ApplicationRecord
-        current = model.find_by(id: reference.id)
-        if boundary.current?
-          current
-        else
-          versions = PaperTrail::Version.where(item_type: model.base_class.name, item_id: reference.id)
-          later = versions.where(
-            "created_at > :time OR (created_at = :time AND id > :id)",
-            time: boundary.recorded_at,
-            id: boundary.version_id
-          ).order(:created_at, :id).first
+    association_path.each_with_index.reduce(snapshot) do |current, (name, index)|
+      reference = record_path[index]
+      break nil unless current && reference
 
-          later&.reify || current || versions.order(:created_at, :id).last&.reify
-        end
+      current.associations[name]&.records&.find do |candidate|
+        candidate.type == reference.type && candidate.id == reference.id
       end
     end
+  end
+
+  def attribute_of(snapshot, name)
+    snapshot&.attributes&.[](name).presence
   end
 
   def actor_name(boundary)

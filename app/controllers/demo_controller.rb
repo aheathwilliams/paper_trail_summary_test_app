@@ -101,7 +101,8 @@ class DemoController < ApplicationController
       from: @from_version,
       to: @to_endpoint,
       **scoped_options,
-      activity: true
+      activity: true,
+      snapshots: true
     )
     @diff = analysis.diff
     @steps = analysis.timeline
@@ -140,7 +141,8 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: @article,
-      **scoped_options
+      **scoped_options,
+      snapshots: true
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: article)"
@@ -149,7 +151,8 @@ class DemoController < ApplicationController
       @article,
       from: @from_version,
       to: latest_version,
-      **scoped_options
+      **scoped_options,
+      snapshots: true
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
