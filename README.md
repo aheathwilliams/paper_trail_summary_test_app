@@ -1,11 +1,10 @@
 # PaperTrail Diff Lab
 
-A small Rails application for exercising the published `paper_trail_diff`
-package in a realistic integration. Its Gemfile uses:
-
-```ruby
-gem "paper_trail_diff", "~> 0.5.0"
-```
+A small Rails application for exercising the published
+[`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) gem in
+a realistic integration. It installs the gem from RubyGems exactly as any
+application would — see the [`Gemfile`](Gemfile) for the version it pins — so
+running this proves a published release works unchanged.
 
 The demo creates an article history with scalar, nested, through-association,
 and HABTM changes. You can create and edit articles, comments and nested

@@ -19,8 +19,15 @@ gem "sqlite3", ">= 2.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
-# Exercise the same packaged release that an application gets from RubyGems.
-gem "paper_trail_diff", path: "../paper_trail_summary"
+# Point at a working copy of the gem when one sits beside this checkout, which
+# is how unreleased changes get exercised. Without it this file behaves like
+# Gemfile, so cloning only this repository still works.
+gem_working_copy = File.expand_path("../paper_trail_summary", __dir__)
+if Dir.exist?(gem_working_copy)
+  gem "paper_trail_diff", path: gem_working_copy
+else
+  gem "paper_trail_diff"
+end
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show
 # nested, through, and HABTM association diffs as well as scalar diffs.
