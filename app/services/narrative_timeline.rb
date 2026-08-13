@@ -58,6 +58,10 @@ class NarrativeTimeline
     end
   end
 
+  # A join row and the record it credits both surface as additions, so the join
+  # is dropped in favour of the sentence about the author. That pairing is
+  # one-to-one only because authorships are unique per [article, author]; drop
+  # that index and this would silently swallow the extra credits.
   def duplicate_authorship_membership?(entry, entries)
     return false unless entry.record&.type == "Authorship"
     return false unless %i[record_added record_removed].include?(entry.kind)

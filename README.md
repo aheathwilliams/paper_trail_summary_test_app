@@ -105,10 +105,14 @@ Uncheck every attribute to pass `ignore: []` and compare every scalar field.
 
 ## Run it
 
+Ruby 3.1 or newer, as the gem requires. `.ruby-version` records the version
+this is developed and tested against; any supported Ruby works, so a version
+manager that refuses that exact build is safe to point elsewhere.
+
 ```console
-mise exec -- bundle install
-mise exec -- bundle exec rails db:setup
-mise exec -- bundle exec rails server
+bundle install
+bin/rails db:setup
+bin/rails server
 ```
 
 Open <http://localhost:3000>. Use **Regenerate history** whenever you want a
@@ -117,17 +121,19 @@ clean deterministic dataset.
 After a new gem release, update the locked package and restart the Rails server:
 
 ```console
-mise exec -- bundle update paper_trail_diff
+bundle update paper_trail_diff
 ```
 
-To exercise unpublished changes instead, use `Gemfile.local`, which is this
-Gemfile with the gem sourced from the neighbouring working tree. It leaves the
-pinned release in place, so both can be run without editing either file:
+To exercise unpublished gem changes instead, use `Gemfile.local`. It is this
+Gemfile with the gem sourced from a working copy checked out beside this
+repository, falling back to the published release when there is none — so it
+works whether or not you cloned the gem too, and leaves the pinned release in
+place either way:
 
 ```console
-mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle install
-mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle exec rails test
-mise exec -- env BUNDLE_GEMFILE=Gemfile.local bundle exec rails server
+BUNDLE_GEMFILE=Gemfile.local bundle install
+BUNDLE_GEMFILE=Gemfile.local bin/rails test
+BUNDLE_GEMFILE=Gemfile.local bin/rails server
 ```
 
 The pinned release and the working tree can be compared directly by running the
@@ -139,6 +145,6 @@ default 31-version dataset shows almost no difference.
 ## Verify it
 
 ```console
-mise exec -- bundle exec rails test
-mise exec -- bundle exec rails runner 'puts PaperTrailDiff::VERSION'
+bundle exec rails test
+bundle exec rails runner 'puts PaperTrailDiff::VERSION'
 ```
