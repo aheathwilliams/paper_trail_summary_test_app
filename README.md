@@ -110,13 +110,15 @@ this is developed and tested against; any supported Ruby works, so a version
 manager that refuses that exact build is safe to point elsewhere.
 
 ```console
-bundle install
-bin/rails db:setup
-bin/rails server
+bin/setup
 ```
 
-Open <http://localhost:3000>. Use **Regenerate history** whenever you want a
-clean deterministic dataset.
+That installs dependencies, creates the database, seeds a demo history, and
+starts the server. Open <http://localhost:3000>. Use **Regenerate history**
+whenever you want a clean deterministic dataset.
+
+Add `--skip-server` to stop before booting, or `--reset` to rebuild the
+database from scratch. Afterwards `bin/dev` starts the server on its own.
 
 After a new gem release, update the locked package and restart the Rails server:
 
