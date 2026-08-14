@@ -585,15 +585,20 @@
       <% elsif @diff %>
         <fieldset class="result-view-controls" id="result-views">
           <legend>Choose a comparison view</legend>
-          <input class="result-view-input" type="radio" name="result-view" id="result-view-endpoint" checked>
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-overview" checked>
+          <input class="result-view-input" type="radio" name="result-view" id="result-view-endpoint">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-checkpoints">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-activity">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-visible">
           <input class="result-view-input" type="radio" name="result-view" id="result-view-narratives">
           <div class="result-view-tabs">
+            <label for="result-view-overview">
+              <span>Overview</span>
+              <strong>Net</strong>
+            </label>
             <label for="result-view-endpoint">
               <span>Endpoint diff</span>
-              <strong>Net</strong>
+              <strong>Detail</strong>
             </label>
             <label for="result-view-checkpoints">
               <span>Checkpoints</span>
@@ -614,55 +619,56 @@
           </div>
         </fieldset>
 
+        <section class="result-panel result-panel--overview">
+          <div class="section-heading timeline-heading">
+            <div>
+              <p class="eyebrow">Net change</p>
+              <h2>What this range did</h2>
+            </div>
+            <code>analysis.diff</code>
+          </div>
+
+          <% if @diff.record_presence_change %>
+            <%= render "demo/endpoint_presence_change", change: @diff.record_presence_change %>
+          <% end %>
+          <%= render "demo/result_summary", diff: @diff %>
+
+          <%# demo:code overview.view %>
+          <%# The net diff answers "what is different now"; expanding answers
+              "how did it get that way". Both come from the one `analyze` pass,
+              so opening this costs no further queries. %>
+          <details class="overview-activity">
+            <summary>
+              <span>
+                <strong>Show how it got there</strong>
+                <small><%= pluralize(@activity_steps.length, "activity transition") %>,
+                  including changes to comments, authors, and tags</small>
+              </span>
+              <span class="timeline-caret" aria-hidden="true">▾</span>
+            </summary>
+            <%= render "demo/activity_steps",
+                       steps: @activity_steps,
+                       open: false,
+                       empty_message: "Equal endpoints produce no activity transitions." %>
+          </details>
+          <%# demo:code end %>
+
+          <%= render "demo/source", view: "overview" %>
+        </section>
+
         <div class="result-panel result-panel--endpoint">
         <% if @diff.record_presence_change %>
           <%= render "demo/endpoint_presence_change", change: @diff.record_presence_change %>
         <% end %>
-        <div class="result-summary">
-          <div class="metric">
-            <strong><%= endpoint_attribute_count(@diff) %></strong>
-            <span><%= endpoint_attribute_label(@diff) %></span>
-          </div>
-          <% comments_diff = @diff.associations["comments"] %>
-          <% authors_diff = @diff.associations["authors"] %>
-          <% tags_diff = @diff.associations["tags"] %>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "comments", :added) %></strong>
-            <span>comments added</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "comments", :removed) %></strong>
-            <span>comments removed</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "comments", :changed) %></strong>
-            <span>comments changed</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "authors", :added) %></strong>
-            <span>authors added</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "authors", :removed) %></strong>
-            <span>authors removed</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "authors", :changed) %></strong>
-            <span>authors changed</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "tags", :added) %></strong>
-            <span>tags added</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "tags", :removed) %></strong>
-            <span>tags removed</span>
-          </div>
-          <div class="metric">
-            <strong><%= endpoint_collection_count(@diff, "tags", :changed) %></strong>
-            <span>tags changed</span>
-          </div>
-        </div>
+        <%# demo:code endpoint.view %>
+        <%# `diff.attributes` holds only what changed, each entry a ValueChange
+            with `from` and `to`. Associations are keyed by the path you asked
+            for and split into added / removed / changed. %>
+        <%= render "demo/result_summary", diff: @diff %>
+        <%# demo:code end %>
+        <% comments_diff = @diff.associations["comments"] %>
+        <% authors_diff = @diff.associations["authors"] %>
+        <% tags_diff = @diff.associations["tags"] %>
 
         <div class="diff-layout">
           <div>
@@ -808,6 +814,8 @@
             <summary>Structured Ruby result</summary>
             <pre><%= JSON.pretty_generate(@diff.to_h) %></pre>
           </details>
+
+          <%= render "demo/source", view: "endpoint" %>
         </div>
         </div>
       <% end %>
@@ -839,6 +847,9 @@
         </div>
 
         <div class="timeline">
+          <%# demo:code checkpoints.view %>
+          <%# One step per adjacent pair of root versions. `step.diff` is what changed %>
+          <%# between them, including any selected associations. %>
           <% @steps.each_with_index do |step, index| %>
             <article class="timeline-step">
               <div class="timeline-marker"><%= index + 1 %></div>
@@ -858,10 +869,13 @@
               </details>
             </article>
           <% end %>
+          <%# demo:code end %>
           <% if @steps.empty? %>
             <div class="panel empty-step">Equal endpoints produce a frozen empty timeline.</div>
           <% end %>
         </div>
+
+        <%= render "demo/source", view: "checkpoints" %>
       </section>
     <% end %>
 
@@ -879,36 +893,14 @@
           <div class="timeline-notice"><%= @activity_notice %></div>
         <% end %>
 
-        <div class="timeline">
-          <% @activity_steps.each_with_index do |step, index| %>
-            <article class="timeline-step activity-step">
-              <div class="timeline-marker"><%= index + 1 %></div>
-              <details class="panel timeline-card activity-card" open>
-                <summary class="step-heading">
-                  <div class="activity-boundary-flow">
-                    <span class="activity-boundary">
-                      <strong><%= activity_boundary_label(step.from_boundary) %></strong>
-                      <small><%= activity_boundary_context(step.from_boundary) %></small>
-                    </span>
-                    <strong>→</strong>
-                    <span class="activity-boundary">
-                      <strong><%= activity_boundary_label(step.to_boundary) %></strong>
-                      <small><%= activity_boundary_context(step.to_boundary) %></small>
-                    </span>
-                  </div>
-                  <span class="step-status">
-                    <span class="tag"><%= activity_diff_summary(step.diff) %></span>
-                    <span class="timeline-caret" aria-hidden="true">▾</span>
-                  </span>
-                </summary>
-                <%= render "demo/activity_diff", diff: step.diff %>
-              </details>
-            </article>
-          <% end %>
-          <% if @activity_steps.empty? %>
-            <div class="panel empty-step">Equal endpoints produce no activity transitions.</div>
-          <% end %>
-        </div>
+        <%# demo:code activity.view %>
+        <%= render "demo/activity_steps",
+                   steps: @activity_steps,
+                   open: true,
+                   empty_message: "Equal endpoints produce no activity transitions." %>
+        <%# demo:code end %>
+
+        <%= render "demo/source", view: "activity" %>
       </section>
     <% end %>
 
@@ -932,6 +924,9 @@
         <% end %>
 
         <div class="timeline">
+          <%# demo:code visible.view %>
+          <%# The activity steps with empty ones dropped, so every card is a change %>
+          <%# somebody actually made. %>
           <% @visible_activity_steps.each_with_index do |step, index| %>
             <% event = step.from_boundary %>
             <article class="timeline-step visible-event-step">
@@ -956,10 +951,13 @@
               </details>
             </article>
           <% end %>
+          <%# demo:code end %>
           <% if @visible_activity_steps.empty? %>
             <div class="panel empty-step">No visible changes remain after ignores.</div>
           <% end %>
         </div>
+
+        <%= render "demo/source", view: "visible" %>
       </section>
     <% end %>
 
@@ -983,6 +981,10 @@
         <% end %>
 
         <div class="timeline narrative-timeline">
+          <%# demo:code narratives.view %>
+          <%# Each event carries a sentence plus its supporting detail. The gem provides %>
+          <%# the evidence; the wording belongs to this application, because only it knows %>
+          <%# what an Article or a Reply means to a reader. %>
           <% @narrative_events.each_with_index do |event, index| %>
             <article class="timeline-step narrative-event-step">
               <div class="timeline-marker"><%= index + 1 %></div>
@@ -1017,10 +1019,13 @@
               </div>
             </article>
           <% end %>
+          <%# demo:code end %>
           <% if @narrative_events.empty? %>
             <div class="panel empty-step">No changes remain to narrate after ignores.</div>
           <% end %>
         </div>
+
+        <%= render "demo/source", view: "narratives" %>
       </section>
     <% end %>
     </div>

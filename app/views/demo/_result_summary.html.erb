@@ -1,0 +1,44 @@
+<%# The net effect of the whole range, shared by the overview and endpoint
+    tabs so both count the same diff the same way. %>
+<div class="result-summary">
+  <div class="metric">
+    <strong><%= endpoint_attribute_count(diff) %></strong>
+    <span><%= endpoint_attribute_label(diff) %></span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "comments", :added) %></strong>
+    <span>comments added</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "comments", :removed) %></strong>
+    <span>comments removed</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "comments", :changed) %></strong>
+    <span>comments changed</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "authors", :added) %></strong>
+    <span>authors added</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "authors", :removed) %></strong>
+    <span>authors removed</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "authors", :changed) %></strong>
+    <span>authors changed</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "tags", :added) %></strong>
+    <span>tags added</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "tags", :removed) %></strong>
+    <span>tags removed</span>
+  </div>
+  <div class="metric">
+    <strong><%= endpoint_collection_count(diff, "tags", :changed) %></strong>
+    <span>tags changed</span>
+  </div>
+</div>

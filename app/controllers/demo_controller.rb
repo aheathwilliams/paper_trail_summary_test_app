@@ -96,16 +96,21 @@ class DemoController < ApplicationController
       return
     end
 
+    # demo:code shared.controller
+    # One pass over the history produces every view on this page. `scoped_options`
+    # carries what the form chose: `associations:`, `ignore:`, and `version_scope:`
+    # when a person is selected.
     analysis = PaperTrailDiff.analyze(
       @article,
       from: @from_version,
       to: @to_endpoint,
       **scoped_options,
-      activity: true,
-      snapshots: true
+      activity: true,   # also build the descendant-aware timeline
+      snapshots: true   # keep each step's reconstructed state for the narrative
     )
-    @diff = analysis.diff
-    @steps = analysis.timeline
+    @diff = analysis.diff       # endpoint and overview tabs
+    @steps = analysis.timeline  # checkpoints tab
+    # demo:code end
     assign_activity_steps(analysis.activity_timeline)
     @activity_api_label = if @selected_author
       "PaperTrailDiff.analyze(..., activity: true, version_scope: ...)"
@@ -165,8 +170,17 @@ class DemoController < ApplicationController
 
   def assign_activity_steps(steps)
     @activity_steps = steps
+    # demo:code visible.controller
+    # A step whose diff is empty is a boundary nothing you selected crossed --
+    # a checkpoint, or a change to a field you ignored. Every step type answers
+    # `empty?`, so one filter serves both timelines.
     @visible_activity_steps = steps.reject(&:empty?)
+    # demo:code end
+    # demo:code narratives.controller
+    # The narrative reads reconstructed state from each step, which is why the
+    # steps above are built with `snapshots: true`.
     @narrative_events = NarrativeTimeline.new(@visible_activity_steps).call
+    # demo:code end
   end
 
   def comparison_options

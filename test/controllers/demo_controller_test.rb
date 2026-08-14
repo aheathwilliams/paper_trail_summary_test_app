@@ -15,25 +15,33 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select "h1", text: /PaperTrail/
-    assert_select ".metric", count: 10
-    assert_select ".result-view-tabs label", count: 5
+    # The net summary appears in both the overview and endpoint panels.
+    assert_select ".metric", count: 20
+    assert_select ".result-view-tabs label", count: 6
     assert_select "label[for='result-view-narratives']", text: /Narratives/
-    assert_select "#result-view-endpoint[checked]"
+    assert_select "#result-view-overview[checked]"
     assert_select "#to_id option[value='current'][selected]"
-    assert_select ".result-panel", count: 5
+    assert_select ".result-panel", count: 6
     assert_select ".result-panel--checkpoints .timeline-step", count: expected_steps
     assert_select "details.timeline-card:not(.activity-card)", count: expected_steps
     assert_select "details.timeline-card:not(.activity-card)[open]", count: expected_steps
     assert_select ".activity-timeline-section", count: 1
     assert_select ".activity-step.timeline-step"
     assert_select "details.activity-card.timeline-card[open]"
-    assert_select "details.timeline-card:not([open])", count: 0
+    # Cards start open everywhere except inside the overview's disclosure,
+    # where the point is a scannable list rather than a wall of diffs.
+    assert_select ".result-panel:not(.result-panel--overview) details.timeline-card:not([open])",
+                  count: 0
+    assert_select ".result-panel--overview details.timeline-card:not([open])"
     assert_select ".activity-card > .activity-change-visual"
     assert_select ".activity-card > pre", count: 0
     assert_select ".activity-card .activity-overview"
     assert_select ".activity-card .activity-association-change"
     assert_select ".activity-boundary small", text: /by Maya Chen/
     assert_select ".activity-card details.activity-raw-result pre"
+    assert_select ".result-panel--overview .overview-activity summary strong",
+                  text: /Show how it got there/
+    assert_select ".result-panel--overview .overview-activity .activity-step"
     assert_select ".result-panel--visible .visible-event-card"
     assert_select ".result-panel--visible .activity-no-change", count: 0
     assert_select ".visible-events-section code", text: /reject\(&:empty\?\)/
@@ -52,6 +60,12 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select "#association_comments_article", count: 0
     assert_select "#ignore_path_comments_replies_body"
     assert_includes response.body, "Structured Ruby result"
+
+    # Every result view explains how it was produced, from the real files.
+    assert_select ".source-disclosure", count: 6
+    assert_select ".source-snippet figcaption code", text: "app/models/article.rb"
+    assert_select ".source-disclosure pre code", text: /has_paper_trail/
+    assert_select ".source-disclosure pre code", text: /PaperTrailDiff\.analyze/
   end
 
   test "renders lifecycle snapshots and lifecycle-aware metrics" do

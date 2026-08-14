@@ -1,0 +1,32 @@
+<%# Shared by the activity tab and the overview tab's expansion, so both render
+    the same boundaries from the same steps rather than drifting apart. %>
+<div class="timeline">
+  <% steps.each_with_index do |step, index| %>
+    <article class="timeline-step activity-step">
+      <div class="timeline-marker"><%= index + 1 %></div>
+      <details class="panel timeline-card activity-card" <%= "open" if open %>>
+        <summary class="step-heading">
+          <div class="activity-boundary-flow">
+            <span class="activity-boundary">
+              <strong><%= activity_boundary_label(step.from_boundary) %></strong>
+              <small><%= activity_boundary_context(step.from_boundary) %></small>
+            </span>
+            <strong>→</strong>
+            <span class="activity-boundary">
+              <strong><%= activity_boundary_label(step.to_boundary) %></strong>
+              <small><%= activity_boundary_context(step.to_boundary) %></small>
+            </span>
+          </div>
+          <span class="step-status">
+            <span class="tag"><%= activity_diff_summary(step.diff) %></span>
+            <span class="timeline-caret" aria-hidden="true">▾</span>
+          </span>
+        </summary>
+        <%= render "demo/activity_diff", diff: step.diff %>
+      </details>
+    </article>
+  <% end %>
+  <% if steps.empty? %>
+    <div class="panel empty-step"><%= empty_message %></div>
+  <% end %>
+</div>

@@ -1,0 +1,26 @@
+<%# Every snippet below is read out of the file named beside it at request time,
+    so it is the code actually running rather than a copy that can drift. %>
+<% snippets = DemoSource.for(view) %>
+<% if snippets.any? %>
+  <details class="source-disclosure">
+    <summary>
+      <span>
+        <strong>Show the code behind this view</strong>
+        <small>Read live from <%= pluralize(snippets.map(&:path).uniq.length, "file") %> in this app</small>
+      </span>
+      <span class="timeline-caret" aria-hidden="true">▾</span>
+    </summary>
+
+    <div class="source-snippets">
+      <% snippets.each do |snippet| %>
+        <figure class="source-snippet">
+          <figcaption>
+            <span class="source-layer"><%= snippet.layer.humanize %></span>
+            <code><%= snippet.path %></code>
+          </figcaption>
+          <pre><code><%= snippet.code %></code></pre>
+        </figure>
+      <% end %>
+    </div>
+  </details>
+<% end %>
