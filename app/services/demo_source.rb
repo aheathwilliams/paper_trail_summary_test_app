@@ -12,25 +12,30 @@ class DemoSource
 
   FILES = {
     "app/models/article.rb" => :ruby,
-    "app/models/comment.rb" => :ruby,
     "app/controllers/demo_controller.rb" => :ruby,
     "app/services/narrative_timeline.rb" => :ruby,
-    "app/views/demo/show.html.erb" => :erb
+    "app/views/demo/show.html.erb" => :erb,
+    "app/views/demo/_activity_diff.html.erb" => :erb,
+    "app/views/demo/_activity_attribute_changes.html.erb" => :erb,
+    "app/views/demo/_activity_association_diff.html.erb" => :erb
   }.freeze
+
+  # Reading order: the models being versioned, the call that runs, the template
+  # that lays the result out, then the partials that unpack the diff itself.
+  LAYER_ORDER = %w[model controller view diff change association narrative].freeze
 
   BEGIN_MARKER = /demo:code\s+(?<key>[a-z_]+\.[a-z_]+)\s*(?:%>)?\s*\z/
   END_MARKER = /demo:code\s+end\s*(?:%>)?\s*\z/
 
   class << self
-    # Snippets for one view, in a stable layer order, with the shared model
-    # first so a reader meets the versioned models before the calls that read
-    # their history.
+    # Snippets for one view in reading order: everything marked `shared.*`
+    # plus everything marked for this view. Selecting by prefix rather than an
+    # explicit list means marking a new region is enough to publish it.
     def for(view)
-      snippets = all
-      %W[
-        shared.model shared.controller
-        #{view}.controller #{view}.view #{view}.narrative
-      ].uniq.filter_map { |key| snippets[key] }
+      relevant = all.values.select do |snippet|
+        snippet.key.start_with?("shared.", "#{view}.")
+      end
+      relevant.sort_by { |snippet| [LAYER_ORDER.index(snippet.layer) || 99, snippet.key] }
     end
 
     def all
@@ -64,7 +69,7 @@ class DemoSource
     def build(key, path, language, lines)
       Snippet.new(
         key: key,
-        layer: key.split(".").last,
+        layer: key.split(".")[1],
         path: path,
         language: language,
         code: dedent(lines)

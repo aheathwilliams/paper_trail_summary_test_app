@@ -6,6 +6,10 @@
     <code><%= association.kind %></code>
   </div>
 
+  <%# demo:code shared.association %>
+  <%# A collection association splits into added / removed / changed. A singular
+      one is a relationship transition instead, so the type decides the shape --
+      `association.kind` names the macro it came from. %>
   <% case association %>
   <% when PaperTrailDiff::CollectionAssociationDiff %>
     <div class="activity-record-list">
@@ -18,6 +22,7 @@
       <% association.changed.each do |change| %>
         <%= render "demo/activity_record_change", change: change %>
       <% end %>
+      <%# demo:code end %>
     </div>
   <% when PaperTrailDiff::ToOneAssociationDiff %>
     <% if association.relationship %>

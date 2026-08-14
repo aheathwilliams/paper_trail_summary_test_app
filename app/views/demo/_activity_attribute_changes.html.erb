@@ -5,6 +5,9 @@
       <span><%= pluralize(changes.length, "field") %></span>
     </div>
     <div class="changes">
+      <%# demo:code shared.change %>
+      <%# `attributes` maps a field name to a ValueChange, which carries only
+          `from` and `to`. Unchanged fields are absent rather than equal. %>
       <% changes.each do |name, change| %>
         <div class="change-card activity-change-card">
           <code><%= name %></code>
@@ -18,6 +21,7 @@
           </div>
         </div>
       <% end %>
+      <%# demo:code end %>
     </div>
   </section>
 <% end %>

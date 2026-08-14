@@ -17,6 +17,10 @@
       <% end %>
     </div>
 
+    <%# demo:code shared.diff %>
+    <%# Every view ends up here: this is how a Diff is read. `record_presence_change`
+        is set only when the record appeared or disappeared; `attributes` holds
+        the scalar changes; `associations` is keyed by the paths you asked for. %>
     <% if diff.record_presence_change %>
       <section class="activity-change-section">
         <div class="activity-change-heading"><h4>Root record state</h4></div>
@@ -29,6 +33,7 @@
     <% diff.associations.each do |name, association| %>
       <%= render "demo/activity_association_diff", name: name, association: association %>
     <% end %>
+    <%# demo:code end %>
   <% end %>
 
   <details class="activity-raw-result">

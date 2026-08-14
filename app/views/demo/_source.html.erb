@@ -6,7 +6,8 @@
     <summary>
       <span>
         <strong>Show the code behind this view</strong>
-        <small>Read live from <%= pluralize(snippets.map(&:path).uniq.length, "file") %> in this app</small>
+        <small>Read live from <%= pluralize(snippets.map(&:path).uniq.length, "file") %> in this app.
+          <span class="src-gem">Gem API</span> and <span class="src-comment">commentary</span> are highlighted.</small>
       </span>
       <span class="timeline-caret" aria-hidden="true">▾</span>
     </summary>
@@ -18,7 +19,7 @@
             <span class="source-layer"><%= snippet.layer.humanize %></span>
             <code><%= snippet.path %></code>
           </figcaption>
-          <pre><code><%= snippet.code %></code></pre>
+          <pre><code><%= demo_source_html(snippet) %></code></pre>
         </figure>
       <% end %>
     </div>

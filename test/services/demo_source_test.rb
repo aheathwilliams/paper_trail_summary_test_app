@@ -34,6 +34,25 @@ class DemoSourceTest < ActiveSupport::TestCase
     end
   end
 
+  test "publishes the partials that unpack a diff, not just the page template" do
+    keys = DemoSource.for("activity").map(&:key)
+
+    # The template shows the loop; these show how a Diff is actually read,
+    # which is the part a reader is looking for.
+    assert_includes keys, "shared.diff"
+    assert_includes keys, "shared.change"
+    assert_includes keys, "shared.association"
+    assert_includes DemoSource.all.fetch("shared.diff").code, "diff.associations"
+    assert_includes DemoSource.all.fetch("shared.change").code, "change.from"
+  end
+
+  test "orders snippets so a reader meets them in reading order" do
+    layers = DemoSource.for("activity").map(&:layer)
+
+    assert_equal layers.sort_by { |l| DemoSource::LAYER_ORDER.index(l) }, layers
+    assert_equal "model", layers.first
+  end
+
   test "reads from disk so a snippet cannot drift from the code it documents" do
     assert_includes DemoSource::FILES.keys, "app/controllers/demo_controller.rb"
 

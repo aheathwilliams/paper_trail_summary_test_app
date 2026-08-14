@@ -1973,3 +1973,21 @@ pre {
   font-size: 0.82rem;
   line-height: 1.55;
 }
+
+.src-comment {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.src-gem {
+  color: var(--blue);
+  font-weight: 650;
+  background: rgba(19, 67, 84, 0.07);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+
+.source-disclosure > summary small .src-gem,
+.source-disclosure > summary small .src-comment {
+  font-size: 0.78rem;
+}

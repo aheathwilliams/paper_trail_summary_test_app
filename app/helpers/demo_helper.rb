@@ -122,4 +122,51 @@ module DemoHelper
 
     content_tag(:span, text, class: "activity-value#{modifier}")
   end
+
+  # Emphasises the two things a reader of these snippets is looking for: the
+  # calls into the gem, and the prose explaining why they are there. Deliberately
+  # not general syntax highlighting -- colouring every token equally would bury
+  # the parts that matter.
+  GEM_API = Regexp.union(
+    /PaperTrailDiff(?:::[A-Za-z_]+)*/,
+    /\b(?:associations|ignore|version_scope|snapshots|activity|close_on|within|from|to):/,
+    /\.(?:diff|timeline|activity_timeline|attributes|associations|record_presence_change|
+         from_boundary|to_boundary|from_snapshot|to_snapshot|added|removed|changed|
+         kind|whodunnit|reify|to_h|empty\?)\b/x,
+    /\bhas_paper_trail\b/
+  ).freeze
+
+  def demo_source_html(snippet)
+    in_erb_comment = false
+    lines = snippet.code.split("\n").map do |line|
+      html, in_erb_comment = demo_source_line(line, snippet.language, in_erb_comment)
+      html
+    end
+    safe_join(lines, "\n")
+  end
+
+  private
+
+  def demo_source_line(line, language, in_erb_comment)
+    if in_erb_comment
+      return [comment_span(line), !line.include?("%>")]
+    end
+    if language == :erb && line.lstrip.start_with?("<%#")
+      return [comment_span(line), !line.include?("%>")]
+    end
+    return [comment_span(line), false] if line.lstrip.start_with?("#")
+
+    code, trailing = line.split(/(?=\s+#[^"']*\z)/, 2)
+    [safe_join([gem_api_html(code.to_s), trailing ? comment_span(trailing) : nil].compact), false]
+  end
+
+  def comment_span(text)
+    tag.span(text, class: "src-comment")
+  end
+
+  # Escape first, then mark up, so nothing in the source can inject markup.
+  def gem_api_html(code)
+    escaped = ERB::Util.html_escape(code).to_s
+    escaped.gsub(GEM_API) { |match| tag.span(match.html_safe, class: "src-gem") }.html_safe
+  end
 end
