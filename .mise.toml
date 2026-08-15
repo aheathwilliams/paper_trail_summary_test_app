@@ -1,0 +1,8 @@
+# Pins the toolchain for this repository so mise does not fall back to whatever
+# a contributor's global default happens to be.
+#
+# The version itself stays in .ruby-version, which is what CI's setup-ruby and
+# every other Ruby version manager already read. This only tells mise to honour
+# that file rather than restating the version and letting the two drift.
+[settings]
+idiomatic_version_file_enable_tools = ["ruby"]
