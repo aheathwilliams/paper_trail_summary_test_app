@@ -10,7 +10,31 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_08_052000) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_15_020313) do
+  create_table "active_storage_attachments", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.bigint "record_id", null: false
+    t.string "record_type", null: false
+  end
+
+  create_table "active_storage_blobs", force: :cascade do |t|
+    t.bigint "byte_size", null: false
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename", null: false
+    t.string "key", null: false
+    t.text "metadata"
+    t.string "service_name", null: false
+  end
+
+  create_table "active_storage_variant_records", force: :cascade do |t|
+    t.bigint "blob_id", null: false
+    t.string "variation_digest", null: false
+  end
+
   create_table "articles", force: :cascade do |t|
     t.text "body"
     t.datetime "created_at", null: false
@@ -54,6 +78,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_08_052000) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["article_id"], name: "index_comments_on_article_id"
+  end
+
+  create_table "document_revisions", force: :cascade do |t|
+    t.integer "attachable_id", null: false
+    t.string "attachable_type", null: false
+    t.bigint "byte_size"
+    t.string "checksum"
+    t.string "content_type"
+    t.datetime "created_at", null: false
+    t.string "filename"
+    t.string "label", null: false
+    t.datetime "updated_at", null: false
+    t.index ["attachable_type", "attachable_id"], name: "index_document_revisions_on_attachable"
   end
 
   create_table "replies", force: :cascade do |t|

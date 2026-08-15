@@ -156,6 +156,24 @@ class DemoHistory
         )
       end
 
+      # A file attachment, audited through a model this application owns. See
+      # DocumentRevision: ActiveStorage's own tables are not versioned, so the
+      # facts worth auditing are mirrored onto columns PaperTrail records.
+      revision = as("Luis Ortega") do
+        rev = article.document_revisions.create!(label: "Budget plan")
+        rev.file.attach(
+          io: StringIO.new("Faculty compensation, first pass"),
+          filename: "budget-v1.txt", content_type: "text/plain"
+        )
+        rev
+      end
+      as("Priya Shah") do
+        revision.file.attach(
+          io: StringIO.new("Faculty compensation, revised after review"),
+          filename: "budget-v2.txt", content_type: "text/plain"
+        )
+      end
+
       # Three people edit the root in a row, which is what makes a per-person
       # report worth filtering. Each transition is bounded by the version that
       # immediately followed it, because a version stores the state before its
@@ -194,6 +212,9 @@ class DemoHistory
     def clear!
       PaperTrail::VersionAssociation.delete_all
       PaperTrail::Version.delete_all
+      ActiveStorage::Attachment.delete_all
+      ActiveStorage::Blob.delete_all
+      DocumentRevision.delete_all
       ApplicationRecord.connection.delete("DELETE FROM articles_tags")
       Reply.delete_all
       Comment.delete_all

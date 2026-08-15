@@ -6,6 +6,9 @@ class Article < ApplicationRecord
   has_many :authorships, dependent: :destroy
   has_many :authors, through: :authorships
   has_and_belongs_to_many :tags
+  # An attachment audited through a model this application owns; see
+  # DocumentRevision for why it cannot go through ActiveStorage directly.
+  has_many :document_revisions, as: :attachable, dependent: :destroy
 
   # Every model whose history is compared needs this, including the children
   # and the join model -- not just the root.
