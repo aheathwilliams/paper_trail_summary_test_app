@@ -8,6 +8,7 @@ Rails.application.routes.draw do
     end
     resources :authorships, only: %i[create destroy]
     resources :taggings, only: %i[create destroy]
+    resources :document_revisions, only: %i[create update destroy]
   end
   resources :authors, only: %i[create update]
   resources :tags, only: %i[create update]

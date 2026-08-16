@@ -423,6 +423,94 @@
       </div>
     </section>
 
+    <section class="panel authors-panel documents-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">File attachment, audited indirectly</p>
+          <h2>Documents</h2>
+        </div>
+        <code>has_many :document_revisions, as: :attachable</code>
+      </div>
+
+      <p class="documents-explainer">
+        ActiveStorage keeps attachments and blobs in tables Rails owns and
+        PaperTrail never versions, so there is no history behind
+        <code>has_one_attached</code> to compare — asking for it raises
+        <code>UnversionedAssociationError</code> rather than reporting that
+        nothing changed. This article reaches its files through
+        <code>DocumentRevision</code>, a model this app owns: it holds the
+        attachment and copies the blob's filename, type, size, and checksum onto
+        its own columns, which PaperTrail records like any other change. Replace
+        a file below and watch those columns move in the diff.
+      </p>
+
+      <div class="authors-layout">
+        <div class="author-list">
+          <% @document_revisions.each do |revision| %>
+            <article class="author-card">
+              <div class="author-avatar">&#128196;</div>
+              <div class="author-copy">
+                <strong><%= revision.label %></strong>
+                <p>
+                  <%= revision.filename.presence || "no file yet" %>
+                  <% if revision.byte_size %>
+                    · <%= number_to_human_size(revision.byte_size) %>
+                  <% end %>
+                </p>
+                <% if revision.checksum %>
+                  <p class="muted"><small>checksum <%= revision.checksum.first(12) %>…</small></p>
+                <% end %>
+                <details class="comment-editor">
+                  <summary>Replace the file or remove this document</summary>
+                  <%= form_with model: [ @article, revision ], class: "record-form compact-form" do |form| %>
+                    <label class="full-field">
+                      <span>Replacement file</span>
+                      <%= form.file_field :file, required: true %>
+                    </label>
+                    <label>
+                      <span>Actor / whodunnit</span>
+                      <%= text_field_tag :actor, "Manual tester" %>
+                    </label>
+                    <%= form.submit "Replace file", class: "button button-small" %>
+                  <% end %>
+                  <%= button_to "Remove document",
+                    article_document_revision_path(@article, revision),
+                    method: :delete,
+                    params: { actor: "Manual tester" },
+                    class: "text-button danger-button" %>
+                </details>
+              </div>
+            </article>
+          <% end %>
+          <% if @document_revisions.empty? %>
+            <p class="muted">No documents are attached to this article.</p>
+          <% end %>
+        </div>
+
+        <div class="author-forms">
+          <details class="comment-editor">
+            <summary>Attach a new document</summary>
+            <%= form_with model: [ @article, DocumentRevision.new ], class: "record-form compact-form" do |form| %>
+              <label>
+                <span>Label</span>
+                <%= form.text_field :label, required: true, placeholder: "Budget plan" %>
+              </label>
+              <label class="full-field">
+                <span>File</span>
+                <%= form.file_field :file, required: true %>
+              </label>
+              <label>
+                <span>Actor / whodunnit</span>
+                <%= text_field_tag :actor, "Manual tester" %>
+              </label>
+              <%= form.submit "Attach document", class: "button button-small" %>
+            <% end %>
+          </details>
+        </div>
+      </div>
+    </section>
+
+
     <div class="result-workspace">
     <section class="panel compare-panel">
       <div class="section-heading">

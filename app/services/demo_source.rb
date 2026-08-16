@@ -12,6 +12,7 @@ class DemoSource
 
   FILES = {
     "app/models/article.rb" => :ruby,
+    "app/models/document_revision.rb" => :ruby,
     "app/controllers/demo_controller.rb" => :ruby,
     "app/services/narrative_timeline.rb" => :ruby,
     "app/views/demo/show.html.erb" => :erb,
@@ -22,7 +23,7 @@ class DemoSource
 
   # Reading order: the models being versioned, the call that runs, the template
   # that lays the result out, then the partials that unpack the diff itself.
-  LAYER_ORDER = %w[model controller view diff change association narrative].freeze
+  LAYER_ORDER = %w[model attachment controller view diff change association narrative].freeze
 
   BEGIN_MARKER = /demo:code\s+(?<key>[a-z_]+\.[a-z_]+)\s*(?:%>)?\s*\z/
   END_MARKER = /demo:code\s+end\s*(?:%>)?\s*\z/

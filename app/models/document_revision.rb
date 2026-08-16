@@ -11,9 +11,12 @@
 # callback below arranges: attaching a file touches ActiveStorage's tables and
 # nothing here, so without it there would be no version at all.
 class DocumentRevision < ApplicationRecord
+  # demo:code shared.attachment
   belongs_to :attachable, polymorphic: true
   has_one_attached :file
 
+  # This record is versioned; ActiveStorage's attachment and blob tables are
+  # not, which is the whole reason the audit trail comes through here.
   has_paper_trail
 
   after_commit :mirror_file_metadata, on: %i[create update]
@@ -39,4 +42,5 @@ class DocumentRevision < ApplicationRecord
       checksum: blob.checksum
     )
   end
+  # demo:code end
 end

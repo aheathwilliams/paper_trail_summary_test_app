@@ -16,6 +16,7 @@ class DemoController < ApplicationController
     @authorships = @article.authorships.includes(:author).order(:id).to_a
     @available_authors = Author.where.not(id: @article.author_ids).order(:name, :id).to_a
     @tags = @article.tags.order(:name, :id).to_a
+    @document_revisions = @article.document_revisions.order(:id).to_a
     @available_tags = Tag.where.not(id: @article.tag_ids).order(:name, :id).to_a
     @versions = @article.versions.order(:created_at, :id).to_a
     @selectable_versions = @versions

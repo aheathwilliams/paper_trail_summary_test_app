@@ -1991,3 +1991,14 @@ pre {
 .source-disclosure > summary small .src-comment {
   font-size: 0.78rem;
 }
+
+.documents-explainer {
+  margin: 0 0 22px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.documents-explainer code {
+  font-size: 0.82rem;
+}
