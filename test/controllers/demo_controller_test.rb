@@ -70,6 +70,10 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
 
   test "renders lifecycle snapshots and lifecycle-aware metrics" do
     create_version = @article.versions.find_by!(event: "create")
+    # Every column the comparison keeps: the primary key is never compared and
+    # updated_at is ignored below. Derived so adding a column to the model does
+    # not silently make this assertion describe the wrong thing.
+    included_attributes = (Article.column_names - %w[id updated_at]).length
 
     get root_url, params: {
       article_id: @article.id,
@@ -84,9 +88,12 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select ".endpoint-presence--created h3", text: "Article becomes present"
     assert_select ".endpoint-presence .activity-record--added"
-    assert_select ".result-summary .metric:first-child strong", text: "4"
+    assert_select ".result-summary .metric:first-child strong", text: included_attributes.to_s
     assert_select ".result-summary .metric:first-child span", text: "attributes included"
-    assert_select ".result-summary .metric:nth-child(2) strong", text: "2"
+    # Every comment the article holds now was added after its create version,
+    # which is where this span starts.
+    assert_select ".result-summary .metric:nth-child(2) strong",
+                  text: @article.comments.count.to_s
     assert_select ".result-summary .metric:nth-child(5) strong", text: "2"
     assert_select ".result-summary .metric:nth-child(8) strong", text: "2"
     assert_select ".result-panel--endpoint", text: /not duplicated as scalar changes/
@@ -116,6 +123,49 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select ".timeline-notice", count: 0
   end
 
+  # A parent and its children saved together produce a version each, so one
+  # action arrives as several steps -- some of which read as empty, because a
+  # child's new value is revealed only by something later.
+  test "group: :transaction reports one saved transaction as one step" do
+    params = {
+      article_id: @article.id,
+      to_id: DemoController::CURRENT_ENDPOINT,
+      associations_configured: "1",
+      associations: %w[comments]
+    }
+
+    get root_url, params: params
+    assert_response :success
+    ungrouped = css_select(".result-panel--activity .activity-card").length
+
+    get root_url, params: params.merge(group: "transaction")
+    assert_response :success
+    grouped = css_select(".result-panel--activity .activity-card").length
+
+    assert grouped < ungrouped,
+           "expected grouping to collapse steps, got #{grouped} from #{ungrouped}"
+    assert_select "select[name='group'] option[value='transaction'][selected]"
+  end
+
+  # The JSON column exists so the endpoint diff can say which keys moved rather
+  # than only that the blob differs.
+  test "shows which keys changed inside a JSON column" do
+    versions = @article.versions.where(event: "update").order(:id)
+
+    get root_url, params: {
+      article_id: @article.id,
+      from_id: versions.first.id,
+      to_id: DemoController::CURRENT_ENDPOINT
+    }
+
+    assert_response :success
+    assert_select ".nested-changes"
+    # A path is rendered from an array, so a dotted key stays unambiguous.
+    assert_select ".nested-change code", text: /seo . priority/
+    # The key the seed adds was absent before, which is not the same as null.
+    assert_select ".nested-change .before", text: /Not present/
+  end
+
   test "applies a configurable attribute blacklist" do
     versions = @article.versions.where(event: "update").order(:id)
 
@@ -127,7 +177,9 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :success
-    assert_select ".metric:first-child strong", text: "1"
+    # body and metadata are what remain once title, status and updated_at are
+    # ignored across this span.
+    assert_select ".metric:first-child strong", text: "2"
     assert_select ".ignore-summary code", text: /title.*status/
   end
 

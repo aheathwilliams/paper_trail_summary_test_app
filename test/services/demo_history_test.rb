@@ -22,8 +22,12 @@ class DemoHistoryTest < ActiveSupport::TestCase
     tags = endpoint_diff.associations.fetch("tags")
     replies = comments.changed.first.associations.fetch("replies")
 
-    assert_equal %w[body status title], endpoint_diff.attributes.keys
-    assert_equal 1, comments.added.length
+    # `metadata` is the JSON column the seed moves so `nested_changes` has
+    # per-key changes to report.
+    assert_equal %w[body metadata status title], endpoint_diff.attributes.keys
+    # Two: the reply-bearing comment, and the one the seeded transaction adds
+    # alongside a body edit so `group: :transaction` has a save to collapse.
+    assert_equal 2, comments.added.length
     assert_equal 1, comments.changed.length
     assert_equal 2, authors.added.length
     assert_equal 1, authors.removed.length

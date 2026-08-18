@@ -104,6 +104,17 @@ module DemoHelper
     change&.to || change&.from
   end
 
+  # A key that was absent is not a key set to null: `{"a": null}` and `{}` mean
+  # different things in JSON, so the gem gives absence its own value and this
+  # renders it as its own thing rather than as "None".
+  def nested_value(value)
+    if value.equal?(PaperTrailDiff::NestedComparator::ABSENT)
+      return tag.span("Not present", class: "activity-value activity-value--empty")
+    end
+
+    activity_value(value)
+  end
+
   def activity_value(value)
     text, modifier = case value
     when nil

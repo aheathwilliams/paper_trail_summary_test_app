@@ -36,7 +36,11 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "pre code", text: /IncompleteTimeRangeError|later root version/
   end
 
-  test "an article with no versions in the window is listed as unchanged, not missing" do
+  # Where `analyze_many` returns an empty Analysis for every record handed to
+  # it, `analyze_scope` selects only the roots whose history moved inside the
+  # window -- so one with no versions there is absent rather than empty, and the
+  # page says how many of the collection the relation actually reached.
+  test "an article with no history in the window is not selected at all" do
     quiet = PaperTrail.request(enabled: false) do
       Article.create!(title: "Untouched", status: "draft", body: "No history at all.")
     end
@@ -44,7 +48,26 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     get report_url(window: "15m")
 
     assert_response :success
-    assert_select ".activity-no-change", text: /#{Regexp.escape(quiet.title)}/
+    assert_select ".activity-card h3", text: quiet.title, count: 0
+    assert_select "p.lede", text: /reached by the relation/
+  end
+
+  # The caveat the page states in prose, exercised: the seeded article was a
+  # draft while the window was open and is approved now, so filtering on its
+  # historical status finds nothing.
+  test "the relation selects on current state, not on state during the window" do
+    article = Article.first
+    assert_equal "approved", article.status
+
+    get report_url(status: "draft")
+
+    assert_response :success
+    assert_select ".activity-card h3", text: article.title, count: 0
+
+    get report_url(status: "approved")
+
+    assert_response :success
+    assert_select ".activity-card h3", text: article.title
   end
 
   # An article created inside the window has no prior state, so its whole diff
@@ -67,6 +90,6 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select ".source-snippet figcaption code", text: "app/controllers/reports_controller.rb"
-    assert_select ".source-snippet", html: /analyze_many/
+    assert_select ".source-snippet", html: /analyze_scope/
   end
 end

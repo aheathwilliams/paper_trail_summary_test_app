@@ -26,6 +26,27 @@ class ArticlesController < ApplicationController
   private
 
   def article_params
-    params.expect(article: %i[title status body])
+    attributes = params.expect(article: %i[title status body metadata])
+    return attributes unless attributes.key?(:metadata)
+
+    attributes.merge(metadata: parsed_metadata(attributes[:metadata]))
+  end
+
+  # The form edits the JSON column as text, so what arrives is a string. A
+  # blank field clears the column; anything unparseable is the caller's typo
+  # rather than a state worth storing.
+  def parsed_metadata(raw)
+    return nil if raw.blank?
+
+    parsed = JSON.parse(raw)
+    raise ActiveRecord::RecordInvalid, invalid_metadata unless parsed.is_a?(Hash)
+
+    parsed
+  rescue JSON::ParserError
+    raise ActiveRecord::RecordInvalid, invalid_metadata
+  end
+
+  def invalid_metadata
+    Article.new.tap { |article| article.errors.add(:metadata, "must be a JSON object") }
   end
 end

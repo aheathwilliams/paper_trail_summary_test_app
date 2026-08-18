@@ -46,6 +46,7 @@ class DemoController < ApplicationController
     @selected_associations = selected_associations
     @author_options = author_options
     @selected_author = selected_author_filter
+    @group = selected_grouping
     @ignored_attributes = configured_ignored_attributes
     @ignored_paths = configured_ignored_paths
     @ignore_option = configured_ignore_option
@@ -107,7 +108,8 @@ class DemoController < ApplicationController
       to: @to_endpoint,
       **scoped_options,
       activity: true,   # also build the descendant-aware timeline
-      snapshots: true   # keep each step's reconstructed state for the narrative
+      snapshots: true,  # keep each step's reconstructed state for the narrative
+      group: @group     # nil, or :transaction to report one save as one step
     )
     @diff = analysis.diff       # endpoint and overview tabs
     @steps = analysis.timeline  # checkpoints tab
@@ -148,7 +150,8 @@ class DemoController < ApplicationController
       from: @from_version,
       to: @article,
       **scoped_options,
-      snapshots: true
+      snapshots: true,
+      group: @group
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: article)"
@@ -158,7 +161,8 @@ class DemoController < ApplicationController
       from: @from_version,
       to: latest_version,
       **scoped_options,
-      snapshots: true
+      snapshots: true,
+      group: @group
     )
     assign_activity_steps(steps)
     @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
@@ -208,6 +212,17 @@ class DemoController < ApplicationController
   def author_options
     @versions.filter_map(&:whodunnit).uniq.sort
   end
+
+  # demo:code activity.controller
+  # A parent and its children saved together produce a version each, so one
+  # deliberate action arrives as several steps -- and some of those read as
+  # empty, because a child's new value is revealed only by a later version of
+  # that child, its destroy version, or the live row. `group: :transaction`
+  # reports the whole save as one step, credited to whoever made it.
+  def selected_grouping
+    params[:group] == "transaction" ? :transaction : nil
+  end
+  # demo:code end
 
   def selected_author_filter
     requested = params[:whodunnit]

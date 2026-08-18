@@ -7,7 +7,12 @@ class DemoHistory
         Article.create!(
           title: "Apollo Notes",
           status: "draft",
-          body: "A short opening about the Apollo program."
+          body: "A short opening about the Apollo program.",
+          metadata: {
+            "seo" => { "slug" => "apollo-notes", "priority" => 3 },
+            "review" => { "required" => true },
+            "keywords" => [ "apollo", "nasa" ]
+          }
         )
       end
 
@@ -64,8 +69,30 @@ class DemoHistory
       as("Maya Chen") do
         article.update!(
           title: "Apollo Notes — First Revision",
-          status: "review"
+          status: "review",
+          # Only `seo.priority` and `keywords` move, and `syndication` appears.
+          # `seo.slug` and `review` stay put, which is what makes a per-key diff
+          # say more than "the blob changed".
+          metadata: {
+            "seo" => { "slug" => "apollo-notes", "priority" => 1 },
+            "review" => { "required" => true },
+            "keywords" => [ "apollo", "nasa", "saturn v" ],
+            "syndication" => { "partner" => "Orbit Weekly" }
+          }
         )
+      end
+
+      # One save touching the article and two of its children together, so the
+      # activity timeline has a transaction worth collapsing.
+      as("Priya Raman") do
+        Article.transaction do
+          article.update!(body: "#{article.body} Filed in one pass.")
+          article.comments.first.update!(body: "Checked against the flight log.")
+          article.comments.create!(
+            author: "Priya Raman",
+            body: "Added during the same save as the body edit."
+          )
+        end
       end
 
       as("Jon Bell") do

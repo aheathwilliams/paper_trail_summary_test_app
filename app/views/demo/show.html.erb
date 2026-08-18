@@ -550,6 +550,18 @@
             followed it, so its diff is exactly what they changed.
           </small>
         </label>
+        <label class="author-filter">
+          <span>Group by</span>
+          <%= form.select :group,
+            options_for_select([ [ "Every boundary", "" ], [ "One step per saved transaction", "transaction" ] ],
+                               @group == :transaction ? "transaction" : "") %>
+          <small>
+            Passed to <code>group: :transaction</code>. A parent and its children
+            saved together produce a version each, so one action arrives as
+            several steps — some reading as empty, because a child's new value is
+            revealed only by something later. Grouping reports the save as one.
+          </small>
+        </label>
         <div class="association-field">
           <span class="field-label">Associations</span>
           <%= hidden_field_tag :associations_configured, "1" %>

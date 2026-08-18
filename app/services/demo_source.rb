@@ -20,12 +20,13 @@ class DemoSource
     "app/views/reports/show.html.erb" => :erb,
     "app/views/demo/_activity_diff.html.erb" => :erb,
     "app/views/demo/_activity_attribute_changes.html.erb" => :erb,
+    "app/views/demo/_nested_changes.html.erb" => :erb,
     "app/views/demo/_activity_association_diff.html.erb" => :erb
   }.freeze
 
   # Reading order: the models being versioned, the call that runs, the template
   # that lays the result out, then the partials that unpack the diff itself.
-  LAYER_ORDER = %w[model attachment controller view diff change association narrative].freeze
+  LAYER_ORDER = %w[model attachment controller view diff change nested association narrative].freeze
 
   BEGIN_MARKER = /demo:code\s+(?<key>[a-z_]+\.[a-z_]+)\s*(?:%>)?\s*\z/
   END_MARKER = /demo:code\s+end\s*(?:%>)?\s*\z/

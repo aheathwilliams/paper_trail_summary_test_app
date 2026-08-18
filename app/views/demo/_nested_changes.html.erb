@@ -1,0 +1,22 @@
+<%# demo:code shared.nested %>
+<%# A JSON or jsonb column reifies to one Hash, so the change above can only say
+    the blob differs. `nested_changes` says which keys moved. It returns nothing
+    for a value it cannot read as two structures, which is why this renders only
+    when there is something to show. %>
+<% nested = PaperTrailDiff.nested_changes(change) %>
+<% if nested.any? %>
+  <div class="nested-changes">
+    <span class="nested-changes-heading"><%= pluralize(nested.length, "key") %> inside</span>
+    <% nested.each do |path, inner| %>
+      <div class="nested-change">
+        <%# Paths are arrays, not dotted strings: a JSON key may contain a dot,
+            so joining would make "a.b" ambiguous between one key and two. %>
+        <code><%= path.join(" › ") %></code>
+        <span class="before"><%= nested_value(inner.from) %></span>
+        <span class="arrow">→</span>
+        <span class="after"><%= nested_value(inner.to) %></span>
+      </div>
+    <% end %>
+  </div>
+<% end %>
+<%# demo:code end %>

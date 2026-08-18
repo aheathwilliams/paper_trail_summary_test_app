@@ -29,8 +29,22 @@
                       ReportsController::WINDOWS.map { |key, meta| [ meta.fetch(:label), key ] },
                       { selected: @window_key },
                       id: "window", onchange: "this.form.requestSubmit()" %>
+      <label for="status">Articles matching</label>
+      <%= form.select :status,
+                      [ [ "Any status", ReportsController::ALL_STATUSES ] ] +
+                        @statuses.map { |value| [ value.humanize, value ] },
+                      { selected: @status },
+                      id: "status", onchange: "this.form.requestSubmit()" %>
       <%= form.submit "Run report", class: "button button-small" %>
     <% end %>
+
+    <p class="lede">
+      The relation picks the population; <code>analyze_scope</code> finds which
+      of its members changed. Note that a relation selects on <strong>current</strong>
+      state, not on state during the window — an article that was
+      <em>draft</em> all week and is <em>approved</em> today will not match
+      <em>draft</em>, even though that is what it was while the window was open.
+    </p>
 
     <p class="lede">
       Ending at <strong>now</strong> is the interesting part. A PaperTrail
@@ -49,6 +63,23 @@
     <% end %>
   </section>
 
+  <% if @unreachable.present? %>
+    <section class="empty-state panel">
+      <p class="eyebrow">Reached by history, not by the relation</p>
+      <p>
+        These roots changed inside the window but have no live row left. A
+        relation's conditions are evaluated against the live table, so a
+        destroyed root cannot be tested against them at all — they are named
+        rather than dropped.
+      </p>
+      <ul class="activity-record-list">
+        <% @unreachable.each do |identity| %>
+          <li class="activity-record activity-record--removed"><code><%= identity.inspect %></code></li>
+        <% end %>
+      </ul>
+    </section>
+  <% end %>
+
   <% if @report_error %>
     <section class="empty-state panel">
       <h2>The report could not run</h2>
@@ -64,10 +95,19 @@
         <div>
           <p class="eyebrow">Results</p>
           <h2><%= pluralize(changed_articles.length, "article") %> changed</h2>
+          <p class="lede">
+            <%= pluralize(reported_articles.length, "article") %> reached by the
+            relation, of <%= pluralize(Article.count, "article") %> in total.
+          </p>
         </div>
       </div>
 
-      <% if changed_articles.empty? %>
+      <% if reported_articles.empty? %>
+        <p class="lede">
+          The relation reached no articles with history in this window. Widen the
+          window, or choose a status that some article currently holds.
+        </p>
+      <% elsif changed_articles.empty? %>
         <p class="lede">Nothing changed in this window. Widen it, or edit an article in the studio.</p>
       <% end %>
 
