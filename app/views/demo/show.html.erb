@@ -10,7 +10,10 @@
         same range one transition at a time.
       </p>
     </div>
-    <%= button_to "Reset all demo data", reset_demo_path, class: "button button-secondary" %>
+    <div class="hero-actions">
+      <%= link_to "Recent activity report", report_path, class: "button button-secondary" %>
+      <%= button_to "Reset all demo data", reset_demo_path, class: "button button-secondary" %>
+    </div>
   </header>
 
   <section class="studio-grid">

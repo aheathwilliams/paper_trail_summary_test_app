@@ -1,6 +1,7 @@
 Rails.application.routes.draw do
   root "demo#show"
   post "reset", to: "demo#reset", as: :reset_demo
+  get "report", to: "reports#show", as: :report
 
   resources :articles, only: %i[create update] do
     resources :comments, only: %i[create update destroy] do

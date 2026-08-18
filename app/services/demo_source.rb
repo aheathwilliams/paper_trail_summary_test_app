@@ -14,8 +14,10 @@ class DemoSource
     "app/models/article.rb" => :ruby,
     "app/models/document_revision.rb" => :ruby,
     "app/controllers/demo_controller.rb" => :ruby,
+    "app/controllers/reports_controller.rb" => :ruby,
     "app/services/narrative_timeline.rb" => :ruby,
     "app/views/demo/show.html.erb" => :erb,
+    "app/views/reports/show.html.erb" => :erb,
     "app/views/demo/_activity_diff.html.erb" => :erb,
     "app/views/demo/_activity_attribute_changes.html.erb" => :erb,
     "app/views/demo/_activity_association_diff.html.erb" => :erb

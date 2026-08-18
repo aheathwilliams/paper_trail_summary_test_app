@@ -1,0 +1,133 @@
+<% content_for :title, "Recent activity report" %>
+
+<main class="shell">
+  <header class="hero">
+    <div>
+      <p class="eyebrow">Batch reporting</p>
+      <h1>Recent <span>activity report</span></h1>
+      <p class="lede">
+        The studio compares one article between two boundaries you pick. This
+        asks a different question — what changed across <em>every</em> article
+        inside a wall-clock window — which is what <code>analyze_many</code>
+        and <code>within:</code> are for.
+      </p>
+    </div>
+    <%= link_to "Back to the studio", root_path, class: "button button-secondary" %>
+  </header>
+
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <p class="eyebrow">Window</p>
+        <h2><%= @window_label %></h2>
+      </div>
+    </div>
+
+    <%= form_with url: report_path, method: :get, class: "record-form compact-form" do |form| %>
+      <label for="window">Report on</label>
+      <%= form.select :window,
+                      ReportsController::WINDOWS.map { |key, meta| [ meta.fetch(:label), key ] },
+                      { selected: @window_key },
+                      id: "window", onchange: "this.form.requestSubmit()" %>
+      <%= form.submit "Run report", class: "button button-small" %>
+    <% end %>
+
+    <p class="lede">
+      Ending at <strong>now</strong> is the interesting part. A PaperTrail
+      version stores the state that existed <em>before</em> its own event, so
+      the last change inside the window has no later version to reveal it.
+      <code>close_on: :current</code> closes the window on the live record
+      instead.
+    </p>
+
+    <% if @incomplete_error %>
+      <div class="empty-state">
+        <p class="eyebrow">Without <code>close_on: :current</code></p>
+        <p>The same window raises rather than under-reporting:</p>
+        <pre><code><%= @incomplete_error %></code></pre>
+      </div>
+    <% end %>
+  </section>
+
+  <% if @report_error %>
+    <section class="empty-state panel">
+      <h2>The report could not run</h2>
+      <pre><code><%= @report_error %></code></pre>
+    </section>
+  <% elsif @articles.empty? %>
+    <section class="empty-state panel">
+      <h2>No articles yet. Seed the demo history from the studio.</h2>
+    </section>
+  <% else %>
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Results</p>
+          <h2><%= pluralize(changed_articles.length, "article") %> changed</h2>
+        </div>
+      </div>
+
+      <% if changed_articles.empty? %>
+        <p class="lede">Nothing changed in this window. Widen it, or edit an article in the studio.</p>
+      <% end %>
+
+      <%# demo:code report.view %>
+      <%# Results are keyed by [item_type, item_id], and every root in the batch
+          gets an entry -- a root with no versions in the window returns an empty
+          Analysis rather than being absent, so a listing needs no special case. %>
+      <% changed_articles.each do |article| %>
+        <% analysis = analysis_for(article) %>
+        <article class="activity-card">
+          <h3><%= link_to article.title, root_path(article_id: article.id) %></h3>
+
+          <p class="activity-overview">
+            <%= pluralize(analysis.timeline.length, "checkpoint") %> in this window
+          </p>
+
+          <%# An article created inside the window has no prior state, so its
+              whole diff is a presence change rather than field-by-field edits.
+              A report that only rendered attributes would show these as blank. %>
+          <% if analysis.diff.record_presence_change %>
+            <%= render "demo/endpoint_presence_change", change: analysis.diff.record_presence_change %>
+          <% end %>
+
+          <% if analysis.diff.attributes.any? %>
+            <p class="activity-change-heading">Fields</p>
+            <ul class="activity-record-list">
+              <% analysis.diff.attributes.each do |name, change| %>
+                <li class="activity-record activity-record--changed">
+                  <code><%= name %></code>
+                  <span class="before"><%= change.from.inspect %></span>
+                  <span class="arrow">→</span>
+                  <span class="after"><%= change.to.inspect %></span>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+
+          <% if analysis.diff.associations.any? %>
+            <p class="activity-change-heading">Associations</p>
+            <ul class="activity-record-list">
+              <% analysis.diff.associations.each do |name, association| %>
+                <li class="activity-record">
+                  <code><%= name %></code>
+                  <%= render "demo/activity_association_diff", name: name, association: association %>
+                </li>
+              <% end %>
+            </ul>
+          <% end %>
+        </article>
+      <% end %>
+      <%# demo:code end %>
+
+      <% if quiet_articles.any? %>
+        <p class="activity-no-change">
+          Unchanged in this window:
+          <%= safe_join(quiet_articles.map { |a| link_to(a.title, root_path(article_id: a.id)) }, ", ") %>
+        </p>
+      <% end %>
+    </section>
+
+    <%= render "demo/source", view: "report" %>
+  <% end %>
+</main>
