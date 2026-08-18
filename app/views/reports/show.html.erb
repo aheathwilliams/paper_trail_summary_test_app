@@ -1,6 +1,6 @@
 <% content_for :title, "Recent activity report" %>
 
-<main class="shell">
+<main class="shell report-shell">
   <header class="hero">
     <div>
       <p class="eyebrow">Batch reporting</p>
@@ -59,7 +59,7 @@
     </p>
 
     <% if @incomplete_error %>
-      <div class="empty-state">
+      <div class="report-note">
         <p class="eyebrow">Without <code>close_on: :current</code></p>
         <p>The same window raises rather than under-reporting:</p>
         <pre><code><%= @incomplete_error %></code></pre>
@@ -68,7 +68,7 @@
   </section>
 
   <% if @unreachable.present? %>
-    <section class="empty-state panel">
+    <section class="panel report-note">
       <p class="eyebrow">Reached by history, not by the relation</p>
       <p>
         These roots changed inside the window but have no live row left. A
@@ -121,7 +121,7 @@
           Analysis rather than being absent, so a listing needs no special case. %>
       <% changed_articles.each do |article| %>
         <% analysis = analysis_for(article) %>
-        <article class="activity-card">
+        <article class="report-card">
           <h3><%= link_to article.title, root_path(article_id: article.id) %></h3>
 
           <p class="activity-overview">

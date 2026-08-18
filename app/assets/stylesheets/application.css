@@ -2094,3 +2094,96 @@ pre {
 .report-form .report-submit {
   min-height: 42px;
 }
+
+/* A callout, not an empty state: `.empty-state` centres its text and is meant
+   for "there is nothing here", which reads wrong for an explanation. */
+.report-note {
+  margin: 18px 0 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 10px;
+  background: #f7f4ec;
+  text-align: left;
+}
+
+.report-note p {
+  margin: 0 0 8px;
+}
+
+.report-note p:last-child {
+  margin-bottom: 0;
+}
+
+.report-note pre {
+  margin: 8px 0 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: #ece7db;
+  text-align: left;
+  white-space: pre-wrap;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+/* One article's result. `.activity-card` has no base rule of its own, so these
+   were rendering with no container at all. */
+.report-card {
+  margin: 16px 0 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+
+.report-card h3 {
+  margin: 0 0 4px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.3rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.report-card h3 a {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 2px solid var(--accent);
+}
+
+.report-card h3 a:hover {
+  color: var(--accent-dark);
+}
+
+.report-card .activity-overview {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.report-card .activity-change-heading {
+  margin: 14px 0 6px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Prose inside a full-width panel: 680px leaves most of the panel empty. */
+.panel > .lede,
+.report-note .lede {
+  max-width: 88ch;
+}
+
+/* `.panel` carries only a border and a background; the studio's panels get
+   their padding from more specific classes. The report's are bare, so they
+   need their own or content sits against the edge and panels abut. */
+.report-shell > .panel {
+  margin-top: 24px;
+  padding: 24px 26px 26px;
+}
+
+.report-shell > .panel > .section-heading {
+  margin-bottom: 4px;
+}

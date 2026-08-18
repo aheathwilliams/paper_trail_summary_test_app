@@ -11,7 +11,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h1", text: /activity report/i
     # The seeded history is minutes old, so the default 24h window covers it.
-    assert_select ".activity-card h3", text: @article.title
+    assert_select ".report-card h3", text: @article.title
   end
 
   test "honours the selected window and rejects an unknown one" do
@@ -48,7 +48,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     get report_url(window: "15m")
 
     assert_response :success
-    assert_select ".activity-card h3", text: quiet.title, count: 0
+    assert_select ".report-card h3", text: quiet.title, count: 0
     assert_select "p.lede", text: /reached by the relation/
   end
 
@@ -62,12 +62,12 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     get report_url(status: "draft")
 
     assert_response :success
-    assert_select ".activity-card h3", text: article.title, count: 0
+    assert_select ".report-card h3", text: article.title, count: 0
 
     get report_url(status: "approved")
 
     assert_response :success
-    assert_select ".activity-card h3", text: article.title
+    assert_select ".report-card h3", text: article.title
   end
 
   # An article created inside the window has no prior state, so its whole diff
@@ -80,7 +80,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     get report_url(window: "15m")
 
     assert_response :success
-    card = css_select(".activity-card").find { |node| node.text.include?(created_in_window.title) }
+    card = css_select(".report-card").find { |node| node.text.include?(created_in_window.title) }
     assert card, "expected a card for the article created inside the window"
     assert_match(/becomes present/, card.text)
   end
