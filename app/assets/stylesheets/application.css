@@ -519,7 +519,9 @@ pre {
 .compare-form {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
-  align-items: end;
+  /* Start, not end: each field carries a different amount of helper text, and
+     aligning their bottoms left the selects themselves at different heights. */
+  align-items: start;
   gap: 12px;
   margin: 28px 0;
   padding: 20px;
@@ -534,8 +536,28 @@ pre {
   gap: 7px;
 }
 
+/* Row 1: the two endpoints and the arrow between them fill the row exactly.
+   Spanning 4 + 1 + 4 left three columns dangling, into which nothing fit, so
+   the next field wrapped and left a ragged hole. */
+.compare-form .endpoint-field {
+  grid-column: span 5;
+}
+
+.compare-form .arrow {
+  grid-column: span 2;
+  align-self: center;
+  padding-bottom: 0;
+  text-align: center;
+}
+
+/* Row 2: three filters, evenly. */
 .compare-form .association-field {
+  grid-column: span 4;
+}
+
+.compare-form .compare-submit {
   grid-column: span 3;
+  align-self: end;
 }
 
 .compare-form .blacklist-field {
@@ -2029,4 +2051,46 @@ pre {
 
 .nested-change code {
   font-weight: 600;
+}
+
+/* The report's own controls. `record-form` assumes a label wrapping its field;
+   these are laid out as a row of paired label + select with the action last. */
+.report-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  align-items: end;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f5f2ea;
+}
+
+.report-form label {
+  display: grid;
+  gap: 7px;
+}
+
+.report-form label > span {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.report-form select {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 11px;
+  border: 1px solid #c8c5bb;
+  border-radius: 8px;
+  color: var(--ink);
+  background: var(--panel);
+  font-size: 0.8rem;
+}
+
+.report-form .report-submit {
+  min-height: 42px;
 }

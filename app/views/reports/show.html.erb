@@ -8,7 +8,7 @@
       <p class="lede">
         The studio compares one article between two boundaries you pick. This
         asks a different question — what changed across <em>every</em> article
-        inside a wall-clock window — which is what <code>analyze_many</code>
+        inside a wall-clock window — which is what <code>analyze_scope</code>
         and <code>within:</code> are for.
       </p>
     </div>
@@ -23,19 +23,23 @@
       </div>
     </div>
 
-    <%= form_with url: report_path, method: :get, class: "record-form compact-form" do |form| %>
-      <label for="window">Report on</label>
-      <%= form.select :window,
-                      ReportsController::WINDOWS.map { |key, meta| [ meta.fetch(:label), key ] },
-                      { selected: @window_key },
-                      id: "window", onchange: "this.form.requestSubmit()" %>
-      <label for="status">Articles matching</label>
-      <%= form.select :status,
-                      [ [ "Any status", ReportsController::ALL_STATUSES ] ] +
-                        @statuses.map { |value| [ value.humanize, value ] },
-                      { selected: @status },
-                      id: "status", onchange: "this.form.requestSubmit()" %>
-      <%= form.submit "Run report", class: "button button-small" %>
+    <%= form_with url: report_path, method: :get, class: "report-form" do |form| %>
+      <label>
+        <span>Report on</span>
+        <%= form.select :window,
+                        ReportsController::WINDOWS.map { |key, meta| [ meta.fetch(:label), key ] },
+                        { selected: @window_key },
+                        onchange: "this.form.requestSubmit()" %>
+      </label>
+      <label>
+        <span>Articles matching</span>
+        <%= form.select :status,
+                        [ [ "Any status", ReportsController::ALL_STATUSES ] ] +
+                          @statuses.map { |value| [ value.humanize, value ] },
+                        { selected: @status },
+                        onchange: "this.form.requestSubmit()" %>
+      </label>
+      <%= form.submit "Run report", class: "button report-submit" %>
     <% end %>
 
     <p class="lede">

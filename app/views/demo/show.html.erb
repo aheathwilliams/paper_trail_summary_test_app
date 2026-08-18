@@ -526,14 +526,14 @@
 
       <%= form_with url: root_path, method: :get, class: "compare-form" do |form| %>
         <%= form.hidden_field :article_id, value: @article.id %>
-        <label>
+        <label class="endpoint-field">
           <span>From</span>
           <%= form.select :from_id,
             @version_options,
             selected: @from_version&.id %>
         </label>
         <div class="arrow" aria-hidden="true">→</div>
-        <label>
+        <label class="endpoint-field">
           <span>To</span>
           <%= form.select :to_id,
             @to_options,
@@ -660,7 +660,7 @@
             </div>
           </details>
         </div>
-        <%= form.submit "Compare versions", class: "button" %>
+        <%= form.submit "Compare versions", class: "button compare-submit" %>
       <% end %>
 
       <div class="ignore-summary">
