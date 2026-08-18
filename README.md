@@ -120,6 +120,22 @@ whenever you want a clean deterministic dataset.
 Add `--skip-server` to stop before booting, or `--reset` to rebuild the
 database from scratch. Afterwards `bin/dev` starts the server on its own.
 
+### Looking at a page
+
+`bin/screenshot` renders pages with a headless browser and writes PNGs to
+`tmp/screenshots`:
+
+```console
+bin/screenshot
+bin/screenshot /report --height 3800
+```
+
+It boots a server if one is not already running and stops the one it started.
+The test suite asserts on the DOM, so a page can be structurally correct and
+visually broken at once — a panel with no padding, a card with no container —
+and every assertion still passes. This exists because looking is the only check
+that finds those, and it needs a browser on the machine but no extra gems.
+
 After a new gem release, update the locked package and restart the Rails server:
 
 ```console

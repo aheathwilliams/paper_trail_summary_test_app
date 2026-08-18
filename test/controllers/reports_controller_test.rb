@@ -56,7 +56,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
   # draft while the window was open and is approved now, so filtering on its
   # historical status finds nothing.
   test "the relation selects on current state, not on state during the window" do
-    article = Article.first
+    article = @article
     assert_equal "approved", article.status
 
     get report_url(status: "draft")

@@ -1,0 +1,108 @@
+#!/usr/bin/env ruby
+# Renders pages with a headless browser so a layout can be looked at rather
+# than reasoned about.
+#
+# The test suite asserts on the DOM, which means a page can be structurally
+# correct and visually broken at the same time -- a panel with no padding, a
+# callout centred by a class meant for empty states, a card with no container.
+# Every one of those passed the suite. Looking is the only check that finds
+# them, and this is what makes looking cheap.
+#
+#   bin/screenshot                 # the studio and the report
+#   bin/screenshot /report         # just one path
+#   bin/screenshot / --height 3800 # a taller viewport for a long page
+#
+# Deliberately not a test: there are no baselines to approve and nothing fails.
+# It writes PNGs to tmp/screenshots and tells you where they are.
+require "fileutils"
+require "net/http"
+
+APP_ROOT = File.expand_path("..", __dir__)
+OUTPUT_DIR = File.join(APP_ROOT, "tmp", "screenshots")
+PORT = ENV.fetch("SCREENSHOT_PORT", "3311")
+BASE = "http://127.0.0.1:#{PORT}"
+DEFAULT_PATHS = [ "/", "/report" ].freeze
+# Chromium ships under several names and Chrome under others; take whichever is
+# installed rather than making the caller configure it.
+BROWSERS = %w[chromium-browser chromium google-chrome google-chrome-stable chrome].freeze
+
+def browser
+  BROWSERS.find { |name| system("command -v #{name} > /dev/null 2>&1") }
+end
+
+def responding?
+  Net::HTTP.start("127.0.0.1", PORT, open_timeout: 1, read_timeout: 2) do |http|
+    http.get("/up").is_a?(Net::HTTPSuccess)
+  end
+rescue StandardError
+  false
+end
+
+def wait_for_server(timeout: 45)
+  timeout.times do
+    return true if responding?
+
+    sleep 1
+  end
+  false
+end
+
+def start_server
+  # Reuse a server that is already up: the caller may be looking at the same
+  # pages by hand, and taking their port away mid-session is unhelpful.
+  return nil if responding?
+
+  puts "== Starting a server on port #{PORT} =="
+  FileUtils.rm_f(File.join(APP_ROOT, "tmp", "pids", "server.pid"))
+  pid = spawn(
+    { "RAILS_ENV" => "development" },
+    File.join(APP_ROOT, "bin", "rails"), "server", "-p", PORT, "-b", "127.0.0.1",
+    out: File::NULL, err: File::NULL
+  )
+  abort "The server did not come up on #{BASE}." unless wait_for_server
+  pid
+end
+
+def capture(name, path, height)
+  target = File.join(OUTPUT_DIR, "#{name}.png")
+  ok = system(
+    name_of_browser, "--headless", "--disable-gpu", "--no-sandbox", "--hide-scrollbars",
+    "--screenshot=#{target}", "--window-size=1400,#{height}", "#{BASE}#{path}",
+    out: File::NULL, err: File::NULL
+  )
+  # Chromium reports success even when it cannot write the file, so check.
+  if ok && File.exist?(target)
+    puts "  #{path.ljust(24)} -> #{target}"
+  else
+    puts "  #{path.ljust(24)} -> FAILED"
+  end
+end
+
+def name_of_browser
+  @name_of_browser ||= browser || abort(
+    "No headless browser found. Install one of: #{BROWSERS.join(', ')}."
+  )
+end
+
+height_index = ARGV.index("--height")
+height = height_index ? ARGV[height_index + 1] : "2400"
+paths = ARGV.reject { |arg| arg.start_with?("--") } - [ height.to_s ]
+paths = DEFAULT_PATHS if paths.empty?
+
+name_of_browser
+FileUtils.mkdir_p(OUTPUT_DIR)
+server = start_server
+
+begin
+  puts "== Capturing at 1400x#{height} =="
+  paths.each do |path|
+    name = path.gsub(%r{[^a-zA-Z0-9]+}, "_").gsub(/\A_|_\z/, "")
+    capture(name.empty? ? "root" : name, path, height)
+  end
+ensure
+  if server
+    Process.kill("TERM", server)
+    Process.wait(server)
+    puts "== Stopped the server it started =="
+  end
+end
