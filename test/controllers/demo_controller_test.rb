@@ -166,6 +166,22 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_select ".nested-change .before", text: /Not present/
   end
 
+  # An array is reported by membership rather than as one opaque before-and-
+  # after: the seed adds a keyword and leaves the rest alone.
+  test "shows what an array inside a JSON column gained" do
+    versions = @article.versions.where(event: "update").order(:id)
+
+    get root_url, params: {
+      article_id: @article.id,
+      from_id: versions.first.id,
+      to_id: DemoController::CURRENT_ENDPOINT
+    }
+
+    assert_response :success
+    assert_select ".nested-change .after", text: /\+ saturn v/
+  end
+
+
   test "applies a configurable attribute blacklist" do
     versions = @article.versions.where(event: "update").order(:id)
 

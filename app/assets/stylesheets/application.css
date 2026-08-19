@@ -2187,3 +2187,14 @@ pre {
 .report-shell > .panel > .section-heading {
   margin-bottom: 4px;
 }
+
+.nested-array-note {
+  font-size: 0.78rem;
+  font-style: italic;
+  color: var(--muted);
+}
+
+.nested-change .before,
+.nested-change .after {
+  font-size: 0.82rem;
+}

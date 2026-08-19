@@ -12,9 +12,27 @@
         <%# Paths are arrays, not dotted strings: a JSON key may contain a dot,
             so joining would make "a.b" ambiguous between one key and two. %>
         <code><%= path.join(" › ") %></code>
-        <span class="before"><%= nested_value(inner.from) %></span>
-        <span class="arrow">→</span>
-        <span class="after"><%= nested_value(inner.to) %></span>
+        <% if inner.is_a?(PaperTrailDiff::ArrayChange) %>
+          <%# An array is reported by membership rather than by position. Its
+              elements carry no identity, so an insertion at the front would make
+              every later index look changed -- one insertion read as several
+              edits. What membership cannot see is a pure reordering, which the
+              gem names rather than passing over. %>
+          <% if inner.reordered? %>
+            <span class="nested-array-note">reordered · same <%= pluralize(inner.to.length, "element") %></span>
+          <% else %>
+            <% if inner.added.any? %>
+              <span class="after">+ <%= inner.added.map { |v| nested_element(v) }.join(", ") %></span>
+            <% end %>
+            <% if inner.removed.any? %>
+              <span class="before">− <%= inner.removed.map { |v| nested_element(v) }.join(", ") %></span>
+            <% end %>
+          <% end %>
+        <% else %>
+          <span class="before"><%= nested_value(inner.from) %></span>
+          <span class="arrow">→</span>
+          <span class="after"><%= nested_value(inner.to) %></span>
+        <% end %>
       </div>
     <% end %>
   </div>

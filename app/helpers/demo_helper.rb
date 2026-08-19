@@ -107,6 +107,17 @@ module DemoHelper
   # A key that was absent is not a key set to null: `{"a": null}` and `{}` mean
   # different things in JSON, so the gem gives absence its own value and this
   # renders it as its own thing rather than as "None".
+  # One element of an array reported by membership. An element that is itself a
+  # structure is shown whole, because the gem does not claim which field of
+  # which object changed -- that would need a pairing nothing licenses.
+  def nested_element(value)
+    case value
+    when Hash, Array then JSON.generate(value.as_json)
+    when nil then "null"
+    else value.to_s
+    end
+  end
+
   def nested_value(value)
     if value.equal?(PaperTrailDiff::NestedComparator::ABSENT)
       return tag.span("Not present", class: "activity-value activity-value--empty")
