@@ -9,7 +9,7 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     # The lab defaults to the first update version through current state, so
     # every later root version contributes one checkpoint step. Deriving the
     # count keeps this test describing the view rather than the fixture's size.
-    expected_steps = @article.versions.where(event: "update").count - 1
+    expected_steps = @article.versions.where(event: "update").count
 
     get root_url
 
@@ -287,5 +287,36 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     follow_redirect!
     assert_response :success
     assert_equal "Apollo Notes — Final", Article.last.title
+  end
+  test "current analysis includes the final checkpoint and a lone create event" do
+    article = Article.create!(title: "Just created", status: "draft", body: "New")
+    get root_url, params: {
+      article_id: article.id, from_id: article.versions.last.id, to_id: "current",
+      associations_configured: "1"
+    }
+
+    assert_response :success
+    assert_select ".result-panel--checkpoints .timeline-step", count: 1
+    assert_select ".result-panel--activity .activity-step", count: 1
+    assert_select ".result-panel--checkpoints", text: /Current Article/
+    assert_select ".result-panel--activity code", text: /PaperTrailDiff.analyze/
+  end
+
+  test "current activity credits only the selected actor's update" do
+    article = Article.create!(title: "Original", status: "draft", body: "Body")
+    PaperTrail.request(whodunnit: "Selected editor") { article.update!(title: "First edit") }
+    first = article.versions.last
+    PaperTrail.request(whodunnit: "Later editor") { article.update!(title: "Later edit") }
+
+    get root_url, params: {
+      article_id: article.id, from_id: first.id, to_id: "current",
+      associations_configured: "1", whodunnit: "Selected editor"
+    }
+
+    assert_response :success
+    assert_select ".result-panel--activity .activity-step", count: 1
+    assert_select ".result-panel--activity .activity-boundary small", text: /Selected editor/
+    assert_select ".result-panel--activity .after", text: /First edit/
+    assert_select ".result-panel--activity .after", text: /Later edit/, count: 0
   end
 end

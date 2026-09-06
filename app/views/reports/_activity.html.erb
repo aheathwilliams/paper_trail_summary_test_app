@@ -1,0 +1,25 @@
+<details class="report-activity" open>
+  <summary><%= pluralize(steps.length, "visible activity step") %></summary>
+  <% steps.each do |step| %>
+    <% event = NarrativeTimeline.new([step]).call.first %>
+    <section class="report-event">
+      <p class="activity-boundary">
+        <strong><%= activity_boundary_context(step.source_boundary) %></strong>
+        <small>Visible by <%= activity_boundary_label(step.to_boundary) %></small>
+      </p>
+      <% event&.items&.each do |item| %>
+        <p class="narrative-sentence"><%= narrative_sentence(item.sentence) %></p>
+        <% item.details.each do |detail| %>
+          <blockquote class="narrative-detail narrative-detail--<%= detail.tone %>">
+            <small><%= narrative_sentence(detail.label) %></small>
+            <%= simple_format(detail.body.to_s) %>
+          </blockquote>
+        <% end %>
+      <% end %>
+      <details class="activity-raw-result">
+        <summary>Structured activity with source metadata</summary>
+        <pre><%= JSON.pretty_generate(step.to_h(metadata: true)) %></pre>
+      </details>
+    </section>
+  <% end %>
+</details>

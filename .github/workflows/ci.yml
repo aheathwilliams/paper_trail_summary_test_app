@@ -5,8 +5,7 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
-  # A published gem release can break this app without anything here changing,
-  # so check on a schedule as well as on a push.
+  # Check the pinned integration on a schedule as well as on a push.
   schedule:
     - cron: "17 6 * * 1"
   workflow_dispatch:
@@ -17,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    name: Rails tests against the published gem
+    name: Rails tests against the pinned gem revision
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

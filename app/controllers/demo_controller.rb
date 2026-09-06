@@ -129,48 +129,36 @@ class DemoController < ApplicationController
 
   def build_current_comparison
     latest_version = @selectable_versions.last
-    @diff = PaperTrailDiff.compare(@from_version, @article, **comparison_options)
-    @steps = PaperTrailDiff.timeline(
-      @article,
-      from: @from_version,
-      to: latest_version,
-      **scoped_options
-    )
-    assign_current_activity_steps(latest_version)
+    begin
+      analysis = PaperTrailDiff.analyze(
+        @article, from: @from_version, to: @article, **scoped_options,
+        activity: true, snapshots: true, group: @group
+      )
+      @diff = analysis.diff
+      @steps = analysis.timeline
+      assign_activity_steps(analysis.activity_timeline)
+      @activity_api_label = "PaperTrailDiff.analyze(..., to: article, activity: true)"
+    rescue PaperTrailDiff::UnsupportedLiveActivityError
+      # HABTM activity needs a historical closing boundary. The endpoint and
+      # checkpoint views can still include the current record explicitly.
+      @diff = PaperTrailDiff.compare(@from_version, @article, **comparison_options)
+      @steps = PaperTrailDiff.timeline(
+        @article, from: @from_version, to: @article, **scoped_options
+      )
+      assign_activity_steps(PaperTrailDiff.activity_timeline(
+        @article, from: @from_version, to: latest_version, **scoped_options,
+        snapshots: true, group: @group
+      ))
+      @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
+      @activity_notice = <<~MESSAGE.squish
+        Live activity is unavailable for the selected HABTM graph, so the activity
+        views end at Version #{latest_version.id}. The endpoint diff still uses the
+        current database state; checkpoints also include the current boundary.
+      MESSAGE
+    end
     @diagnostics = PaperTrailDiff.diagnose(
-      @from_version,
-      latest_version,
-      associations: @selected_associations
+      @from_version, latest_version, associations: @selected_associations
     )
-  end
-
-  def assign_current_activity_steps(latest_version)
-    steps = PaperTrailDiff.activity_timeline(
-      @article,
-      from: @from_version,
-      to: @article,
-      **scoped_options,
-      snapshots: true,
-      group: @group
-    )
-    assign_activity_steps(steps)
-    @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: article)"
-  rescue PaperTrailDiff::UnsupportedLiveActivityError
-    steps = PaperTrailDiff.activity_timeline(
-      @article,
-      from: @from_version,
-      to: latest_version,
-      **scoped_options,
-      snapshots: true,
-      group: @group
-    )
-    assign_activity_steps(steps)
-    @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
-    @activity_notice = <<~MESSAGE.squish
-      Live activity is unavailable for the selected HABTM graph, so the activity
-      views end at Version #{latest_version.id}. The endpoint diff still uses the
-      current database state.
-    MESSAGE
   end
 
   def assign_activity_steps(steps)

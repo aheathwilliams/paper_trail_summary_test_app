@@ -19,7 +19,7 @@ class NarrativeTimeline
       next if items.empty?
 
       Event.new(
-        boundary: step.from_boundary,
+        boundary: step.source_boundary,
         visible_by: step.to_boundary,
         items: items.freeze
       )
@@ -52,9 +52,9 @@ class NarrativeTimeline
     when :record_removed
       membership_item(entry, step, :removed)
     when :record_presence_changed
-      presence_item(entry, step.from_boundary)
+      presence_item(entry, step.source_boundary)
     when :relationship_added, :relationship_removed, :relationship_replaced
-      relationship_item(entry, step.from_boundary)
+      relationship_item(entry, step.source_boundary)
     end
   end
 
@@ -72,7 +72,7 @@ class NarrativeTimeline
   end
 
   def attribute_item(entry, step)
-    boundary = step.from_boundary
+    boundary = step.source_boundary
     change = entry.value
     actor = actor_name(boundary)
     type = entry.record&.type || boundary.item_type
@@ -168,7 +168,7 @@ class NarrativeTimeline
   end
 
   def membership_item(entry, step, state)
-    boundary = step.from_boundary
+    boundary = step.source_boundary
     snapshot = entry.value
     actor = actor_name(boundary)
 

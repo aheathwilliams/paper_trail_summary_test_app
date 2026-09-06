@@ -39,6 +39,12 @@
                         { selected: @status },
                         onchange: "this.form.requestSubmit()" %>
       </label>
+      <label>
+        <span>Activity grouping</span>
+        <%= form.select :group, [["By transaction", "transaction"], ["Individual events", "events"]],
+                        { selected: @group ? "transaction" : "events" },
+                        onchange: "this.form.requestSubmit()" %>
+      </label>
       <%= form.submit "Run report", class: "button report-submit" %>
     <% end %>
 
@@ -58,6 +64,13 @@
       instead.
     </p>
 
+    <p class="lede">
+      Activity includes comments and replies, authorships and authors, and document
+      metadata. Tag membership is available in the studio's endpoint comparison;
+      live HABTM activity is unsupported. Grouped activity credits the first source
+      event; one transaction can contain changes by multiple people.
+    </p>
+
     <% if @incomplete_error %>
       <div class="report-note">
         <p class="eyebrow">Without <code>close_on: :current</code></p>
@@ -67,7 +80,7 @@
     <% end %>
   </section>
 
-  <% if @unreachable.present? %>
+  <% if @deleted_histories.present? %>
     <section class="panel report-note">
       <p class="eyebrow">Reached by history, not by the relation</p>
       <p>
@@ -76,11 +89,22 @@
         destroyed root cannot be tested against them at all — they are named
         rather than dropped.
       </p>
-      <ul class="activity-record-list">
-        <% @unreachable.each do |identity| %>
-          <li class="activity-record activity-record--removed"><code><%= identity.inspect %></code></li>
-        <% end %>
-      </ul>
+      <p>Deleted history is shown separately, regardless of the current status filter.
+        It includes article fields only; historical associations are not requested.</p>
+      <% @deleted_histories.each do |entry| %>
+        <article class="report-card deleted-history">
+          <h3><%= entry.title || "History unavailable" %> <code><%= entry.identity.inspect %></code></h3>
+          <% if entry.steps %>
+            <%= render "reports/activity", steps: entry.steps %>
+          <% else %>
+            <p>No destroy version is available to reconstruct this article.</p>
+          <% end %>
+        </article>
+      <% end %>
+      <% if @unreachable.length > ReportsController::DELETED_LIMIT %>
+        <p>Showing the first <%= ReportsController::DELETED_LIMIT %> of
+          <%= @unreachable.length %> missing articles. Narrow the time window to inspect more.</p>
+      <% end %>
     </section>
   <% end %>
 
@@ -91,7 +115,7 @@
     </section>
   <% elsif @articles.empty? %>
     <section class="empty-state panel">
-      <h2>No articles yet. Seed the demo history from the studio.</h2>
+      <h2>No live articles with history match this report.</h2>
     </section>
   <% else %>
     <section class="panel">
@@ -116,9 +140,9 @@
       <% end %>
 
       <%# demo:code report.view %>
-      <%# Results are keyed by [item_type, item_id], and every root in the batch
-          gets an entry -- a root with no versions in the window returns an empty
-          Analysis rather than being absent, so a listing needs no special case. %>
+      <%# Scoped results are keyed by [item_type, item_id]; only selected roots
+          with history in this window have entries. Activity can be visible even
+          when edits cancel out and the net diff is empty. %>
       <% changed_articles.each do |article| %>
         <% analysis = analysis_for(article) %>
         <article class="report-card">
@@ -127,6 +151,13 @@
           <p class="activity-overview">
             <%= pluralize(analysis.timeline.length, "checkpoint") %> in this window
           </p>
+
+          <%= render "reports/activity", steps: analysis.activity_timeline.reject(&:empty?) %>
+
+          <p class="activity-change-heading">Net change across the window</p>
+          <% if analysis.diff.empty? %>
+            <p>The article returned to its starting state; its activity is shown above.</p>
+          <% end %>
 
           <%# An article created inside the window has no prior state, so its
               whole diff is a presence change rather than field-by-field edits.

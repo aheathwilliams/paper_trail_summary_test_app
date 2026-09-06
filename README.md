@@ -1,10 +1,11 @@
 # PaperTrail Diff Lab
 
-A small Rails application for exercising the published
-[`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) gem in
-a realistic integration. It installs the gem from RubyGems exactly as any
-application would — see the [`Gemfile`](Gemfile) for the version it pins — so
-running this proves a published release works unchanged.
+A small Rails application for exercising
+[`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) in a
+realistic integration. This branch pins the exact gem commit from
+[PR #13](https://github.com/aheathwilliams/paper_trail_diff/pull/13) in `Gemfile`
+and `Gemfile.lock`, including the new batch activity options. No sibling checkout
+is required. `Gemfile.local` optionally uses the gem working copy beside this app.
 
 The demo creates an article history with scalar, nested, through-association,
 and HABTM changes. You can create and edit articles, comments and nested
@@ -76,13 +77,13 @@ The result switcher keeps the net endpoint diff, root checkpoints, complete
 activity history, and presentation-oriented event feed in one place. The event
 feed follows the README pattern and removes empty boundaries with
 `analysis.activity_timeline.reject(&:empty?)`; it attributes each visible diff
-to the step's `from_boundary` because PaperTrail versions contain pre-event
+to the step's `source_boundary` because PaperTrail versions contain pre-event
 state.
 
 The ending selector also offers the current persisted Article. That endpoint is
-passed explicitly to `PaperTrailDiff.compare`; checkpoint timelines remain
-version-bounded. When a selected HABTM path prevents live-ended activity, the
-page keeps the endpoint diff live, ends activity at the latest saved version,
+passed explicitly to `PaperTrailDiff.analyze(..., activity: true)` so endpoint,
+checkpoint, and activity views share one analysis through current state. When a selected HABTM path prevents live-ended activity, the
+page keeps the endpoint and checkpoint views live, ends activity at the latest saved version,
 and explains the distinction. Absent-to-present and present-to-absent endpoint
 comparisons render their `record_presence_change` snapshot and included-state
 metrics instead of presenting an empty scalar diff.
@@ -103,11 +104,35 @@ Like the gem API, a submitted attribute selection replaces the default rather
 than merging with it, so retain `updated_at` when you still want it suppressed.
 Uncheck every attribute to pass `ignore: []` and compare every scalar field.
 
+## Recent activity report
+
+`/report` uses `analyze_scope` with `activity: true`, `group: :transaction`,
+`snapshots: true`, and `close_on: :current`. Switch to individual events to see
+changes before transaction grouping. Retained snapshots supply narrative context;
+the structured disclosure uses `step.to_h(metadata: true)` for source attribution.
+A transaction's source boundary describes its first event, not every actor in it.
+Edits that cancel each other remain visible even when the net diff is empty.
+
+The requested graph is explicit: comments and replies, authorships and authors,
+and document metadata. HABTM tags remain available in the studio's endpoint
+comparison because live HABTM activity is unsupported.
+
+Deleted roots appear separately from the current-status population, even when
+no live articles remain. Their destroy version supplies a historical root for
+`activity_timeline`; rows deleted without one are marked unavailable. This
+fallback requests article fields only, inspects at most 25 missing roots per
+report, and states when more remain. It never assumes a deleted article matched
+the live status filter. The 500-root `analyze_scope` limit is a safety ceiling,
+not pagination, and does not bound the missing-root list.
+
+File metadata is assigned in `DocumentRevision#before_save`, so PaperTrail sees
+it during the same save as the file change, under the submitting actor.
+
 ## Run it
 
-Ruby 3.1 or newer, as the gem requires. `.ruby-version` records the version
-this is developed and tested against; any supported Ruby works, so a version
-manager that refuses that exact build is safe to point elsewhere.
+Use `mise install` and run Ruby commands through `mise exec --`. `.ruby-version`
+pins Ruby 4.0.1 for this Rails app. The gem's Ruby 3.1 compatibility does not mean
+this app's Rails version supports Ruby 3.1.
 
 ```console
 bin/setup
@@ -136,7 +161,8 @@ visually broken at once — a panel with no padding, a card with no container �
 and every assertion still passes. This exists because looking is the only check
 that finds those, and it needs a browser on the machine but no extra gems.
 
-After a new gem release, update the locked package and restart the Rails server:
+After a release containing these APIs, replace the Git source in both Gemfiles
+with that RubyGems version, update the lockfile, and restart the Rails server:
 
 ```console
 bundle update paper_trail_diff
@@ -144,8 +170,8 @@ bundle update paper_trail_diff
 
 To exercise unpublished gem changes instead, use `Gemfile.local`. It is this
 Gemfile with the gem sourced from a working copy checked out beside this
-repository, falling back to the published release when there is none — so it
-works whether or not you cloned the gem too, and leaves the pinned release in
+repository, falling back to the same pinned Git commit when there is none — so it
+works whether or not you cloned the gem too, and leaves the pinned revision in
 place either way:
 
 ```console
@@ -154,7 +180,7 @@ BUNDLE_GEMFILE=Gemfile.local bin/rails test
 BUNDLE_GEMFILE=Gemfile.local bin/rails server
 ```
 
-The pinned release and the working tree can be compared directly by running the
+The pinned revision and the working tree can be compared directly by running the
 same script under each bundle. This is worth doing before a release, because
 the seeded demo history is far too small to expose scaling behaviour: growing
 one article to a few thousand versions separates the two clearly, while the

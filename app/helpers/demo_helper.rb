@@ -46,6 +46,7 @@ module DemoHelper
   def activity_boundary_label(boundary)
     record = activity_record_label(boundary.record)
     return "Current #{record}" if boundary.current?
+    return "Deleted #{record}" if boundary.destroyed?
 
     "#{record} · version #{boundary.version_id}"
   end
@@ -171,15 +172,15 @@ module DemoHelper
 
   def demo_source_line(line, language, in_erb_comment)
     if in_erb_comment
-      return [comment_span(line), !line.include?("%>")]
+      return [ comment_span(line), !line.include?("%>") ]
     end
     if language == :erb && line.lstrip.start_with?("<%#")
-      return [comment_span(line), !line.include?("%>")]
+      return [ comment_span(line), !line.include?("%>") ]
     end
-    return [comment_span(line), false] if line.lstrip.start_with?("#")
+    return [ comment_span(line), false ] if line.lstrip.start_with?("#")
 
     code, trailing = line.split(/(?=\s+#[^"']*\z)/, 2)
-    [safe_join([gem_api_html(code.to_s), trailing ? comment_span(trailing) : nil].compact), false]
+    [ safe_join([ gem_api_html(code.to_s), trailing ? comment_span(trailing) : nil ].compact), false ]
   end
 
   def comment_span(text)

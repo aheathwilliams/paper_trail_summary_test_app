@@ -2198,3 +2198,24 @@ pre {
 .nested-change .after {
   font-size: 0.82rem;
 }
+
+.report-activity > summary {
+  cursor: pointer;
+  padding: 12px 0;
+  font-weight: 700;
+}
+
+.report-event {
+  padding: 16px 0;
+  border-top: 1px solid var(--line);
+}
+
+.report-event .activity-boundary {
+  display: grid;
+  gap: 4px;
+}
+
+.report-event pre {
+  max-height: 360px;
+  overflow: auto;
+}
