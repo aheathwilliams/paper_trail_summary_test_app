@@ -959,7 +959,7 @@
               <details class="panel timeline-card" open>
                 <summary class="step-heading">
                   <div>
-                    <span><%= activity_boundary_label(step.from_boundary) %></span>
+                    <span><%= activity_boundary_label(step.source_boundary) %></span>
                     <strong>→</strong>
                     <span><%= activity_boundary_label(step.to_boundary) %></span>
                   </div>
@@ -1031,7 +1031,7 @@
           <%# The activity steps with empty ones dropped, so every card is a change %>
           <%# somebody actually made. %>
           <% @visible_activity_steps.each_with_index do |step, index| %>
-            <% event = step.from_boundary %>
+            <% event = step.source_boundary %>
             <article class="timeline-step visible-event-step">
               <div class="timeline-marker"><%= index + 1 %></div>
               <details class="panel timeline-card activity-card visible-event-card" open>

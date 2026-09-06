@@ -7,8 +7,7 @@ class DocumentRevisionsController < ApplicationController
 
   def create
     record_as_actor do
-      revision = @article.document_revisions.create!(label: revision_params.fetch(:label))
-      revision.file.attach(revision_params.fetch(:file))
+      @article.document_revisions.create!(revision_params)
       checkpoint!(@article)
     end
 

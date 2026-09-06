@@ -78,4 +78,27 @@ class DocumentRevisionTest < ActiveSupport::TestCase
     end
     assert_match(/not versioned/, error.message)
   end
+  test "file metadata is audited once per upload under the submitting actor" do
+    PaperTrail.request(whodunnit: "Uploader") do
+      @created = @article.document_revisions.create!(
+        label: "One save", file: { io: StringIO.new("first"), filename: "first.txt", content_type: "text/plain" }
+      )
+    end
+    creation = @created.versions.find_by!(event: "create")
+    assert_equal "Uploader", creation.whodunnit
+    assert_equal [ nil, "first.txt" ], creation.changeset.fetch("filename")
+    # ActiveStorage may touch its owner after attaching and analyzing a blob.
+    # Those empty versions must not become a second metadata update.
+    assert_equal 1, @created.versions.count { |version| version.changeset.key?("filename") }
+    assert_equal "first.txt", @created.filename
+
+    PaperTrail.request(whodunnit: "Replacer") do
+      assert_difference -> { @created.versions.reload.count { |version| version.changeset.key?("filename") } }, 1 do
+        @created.file.attach(io: StringIO.new("second"), filename: "second.txt", content_type: "text/plain")
+      end
+    end
+    version = @created.versions.reverse.find { |candidate| candidate.changeset.key?("filename") }
+    assert_equal "Replacer", version.whodunnit
+    assert_equal [ "first.txt", "second.txt" ], version.changeset.fetch("filename")
+  end
 end

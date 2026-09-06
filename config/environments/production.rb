@@ -86,5 +86,4 @@ Rails.application.configure do
 
   # Attachments are demonstrated through a versioned holder model.
   config.active_storage.service = :local
-
 end

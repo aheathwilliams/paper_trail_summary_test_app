@@ -11,19 +11,27 @@ class ReportsController < ApplicationController
   DEFAULT_WINDOW = "24h"
   ALL_STATUSES = "all"
   LIMIT = 500
-  ASSOCIATIONS = %w[comments authorships tags document_revisions].freeze
+  # Live activity cannot reconstruct HABTM membership. The studio still offers
+  # tag endpoint diffs; this report explicitly requests the supported graph.
+  ASSOCIATIONS = %w[comments.replies authorships.author document_revisions].freeze
+  DELETED_LIMIT = 25
 
   def show
     @window_key = WINDOWS.key?(params[:window]) ? params[:window] : DEFAULT_WINDOW
     @window_label = WINDOWS.fetch(@window_key).fetch(:label)
     @status = params[:status].presence || ALL_STATUSES
     @statuses = Article.distinct.order(:status).pluck(:status).compact
-    @scope = article_scope
-    @articles = @scope.order(:title, :id).to_a
+    @scope = article_scope.order(:title, :id)
     @window = window_range
-    return if Article.none?
+    @group = params[:group] == "events" ? nil : :transaction
 
-    @results, @unreachable = build_report
+    report = build_report
+    @results = report.analyses
+    @unreachable = report.unreachable
+    @articles = report.roots
+    @deleted_histories = DeletedArticleHistory.new(
+      @unreachable.first(DELETED_LIMIT), within: @window, group: @group
+    ).call
     @incomplete_error = incomplete_window_error
   rescue PaperTrailDiff::Error => error
     @report_error = "#{error.class}: #{error.message}"
@@ -34,7 +42,8 @@ class ReportsController < ApplicationController
   def window_range
     # A window that ends now, which is what a report about recent activity
     # means. Ending at the present is exactly the case a version cannot close.
-    Time.current - WINDOWS.fetch(@window_key).fetch(:seconds)..Time.current
+    now = Time.current
+    now - WINDOWS.fetch(@window_key).fetch(:seconds)..now
   end
 
   def article_scope
@@ -46,7 +55,7 @@ class ReportsController < ApplicationController
   # demo:code report.controller
   # `analyze_scope` takes the relation rather than a list this controller
   # assembled. It finds the roots whose history moved inside the window, loads
-  # them, and analyzes them in a fixed number of queries -- the selection this
+  # them, and analyzes them -- the selection this
   # gem already performs, which a caller would otherwise reimplement.
   #
   # `close_on: :current` is what makes a window ending *now* answerable. A
@@ -64,7 +73,10 @@ class ReportsController < ApplicationController
       within: @window,
       associations: ASSOCIATIONS,
       limit: LIMIT,
-      close_on: :current
+      close_on: :current,
+      activity: true,
+      group: @group,
+      snapshots: true
     )
   end
   # demo:code end
@@ -84,19 +96,23 @@ class ReportsController < ApplicationController
   # Only roots the relation reached are in the result, so the page reads from
   # it rather than from the article list.
   def reported_articles
-    @articles.select { |article| @results.key?(PaperTrailDiff::Endpoint.identity(article)) }
+    @articles
   end
 
   def changed_articles
-    reported_articles.reject { |article| analysis_for(article).diff.empty? }
+    reported_articles.reject { |article| quiet_analysis?(analysis_for(article)) }
   end
 
   def quiet_articles
-    reported_articles.select { |article| analysis_for(article).diff.empty? }
+    reported_articles.select { |article| quiet_analysis?(analysis_for(article)) }
   end
 
   def analysis_for(article)
-    @results.fetch(PaperTrailDiff::Endpoint.identity(article))
+    @results.fetch([ article.class.base_class.name, article.id.to_s ])
   end
   helper_method :analysis_for
+
+  def quiet_analysis?(analysis)
+    analysis.diff.empty? && analysis.activity_timeline.all?(&:empty?)
+  end
 end

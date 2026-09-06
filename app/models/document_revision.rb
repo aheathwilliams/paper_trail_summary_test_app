@@ -19,7 +19,7 @@ class DocumentRevision < ApplicationRecord
   # not, which is the whole reason the audit trail comes through here.
   has_paper_trail
 
-  after_commit :mirror_file_metadata, on: %i[create update]
+  before_save :mirror_file_metadata
 
   def attached_filename = filename.presence || file.attached? && file.blob.filename.to_s
 
@@ -29,13 +29,9 @@ class DocumentRevision < ApplicationRecord
     return unless file.attached?
 
     blob = file.blob
-    return if checksum == blob.checksum && filename == blob.filename.to_s
-
-    # `update!`, not `update_columns`: PaperTrail hooks into callbacks, so a
-    # column write that skips them records no version at all -- the mirroring
-    # would look right and audit nothing. The guard above stops the recursion
-    # this would otherwise cause.
-    update!(
+    # Include metadata in the same save PaperTrail audits, before its after-save
+    # callback. No recursive save or second transaction is needed.
+    assign_attributes(
       filename: blob.filename.to_s,
       content_type: blob.content_type,
       byte_size: blob.byte_size,

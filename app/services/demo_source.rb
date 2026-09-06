@@ -16,6 +16,7 @@ class DemoSource
     "app/controllers/demo_controller.rb" => :ruby,
     "app/controllers/reports_controller.rb" => :ruby,
     "app/services/narrative_timeline.rb" => :ruby,
+    "app/services/deleted_article_history.rb" => :ruby,
     "app/views/demo/show.html.erb" => :erb,
     "app/views/reports/show.html.erb" => :erb,
     "app/views/demo/_activity_diff.html.erb" => :erb,
@@ -39,7 +40,7 @@ class DemoSource
       relevant = all.values.select do |snippet|
         snippet.key.start_with?("shared.", "#{view}.")
       end
-      relevant.sort_by { |snippet| [LAYER_ORDER.index(snippet.layer) || 99, snippet.key] }
+      relevant.sort_by { |snippet| [ LAYER_ORDER.index(snippet.layer) || 99, snippet.key ] }
     end
 
     def all

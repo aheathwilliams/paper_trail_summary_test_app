@@ -1,11 +1,10 @@
 # Opt-in bundle for exercising the working copy of the gem instead of the
-# packaged release that Gemfile pins:
+# exact Git revision that Gemfile pins:
 #
 #   BUNDLE_GEMFILE=Gemfile.local bin/rails test
 #   BUNDLE_GEMFILE=Gemfile.local bin/rails runner script.rb
 #
-# Gemfile itself stays pinned to the published version so the demo keeps
-# proving that a real application can install and run a release unchanged.
+# Gemfile itself pins the reviewed gem revision for reproducible integration.
 # This file is a copy of it with only the paper_trail_diff source changed.
 
 source "https://rubygems.org"
@@ -26,7 +25,8 @@ gem_working_copy = File.expand_path("../paper_trail_summary", __dir__)
 if Dir.exist?(gem_working_copy)
   gem "paper_trail_diff", path: gem_working_copy
 else
-  gem "paper_trail_diff"
+  gem "paper_trail_diff", git: "https://github.com/aheathwilliams/paper_trail_diff.git",
+    ref: "389ad896fbc2ef5942c6ba34b605a1eb0b3f397c"
 end
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show
