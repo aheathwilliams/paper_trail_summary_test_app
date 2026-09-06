@@ -29,8 +29,8 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
   # The whole reason the report passes `close_on: :current`. A window ending at
   # the present has no version after its final change, so without it the call
   # raises rather than under-reporting -- and the page shows that on purpose.
-  test "shows what close_on: :current protects against" do
-    get_report
+  test "shows what close_on: :current protects against when explicitly requested" do
+    get_report(explain_closure: "1")
 
     assert_response :success
     assert_select "pre code", { text: /IncompleteTimeRangeError|later root version/ }, response.body
@@ -164,6 +164,110 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select ".deleted-history", count: 25
     assert_select "p", text: /Showing the first 25 of\s+26 missing articles/
+  end
+
+  test "historical status finds a moved article that current status excludes" do
+    get_report(status: "review", status_basis: "current")
+    assert_select ".report-card h3", text: @article.title, count: 0
+
+    get_report(status: "review", status_basis: "historical")
+    assert_response :success
+    assert_select ".report-card h3", text: @article.title
+    assert_select "select[name='status'] option[value='review'][selected]"
+    assert_select ".selection-explainer", text: /whole selected window/
+    assert_select ".source-snippet", html: /historical_filter/
+  end
+
+  test "historical status includes only matching deleted histories" do
+    matching = Article.create!(title: "Deleted review", status: "review", body: "Gone")
+    rejected = Article.create!(title: "Deleted draft", status: "draft", body: "Gone")
+    matching.destroy!
+    rejected.destroy!
+
+    get_report(status: "review", status_basis: "historical")
+    assert_response :success
+    assert_select ".deleted-history h3", text: /Deleted review/
+    assert_select ".deleted-history h3", text: /Deleted draft/, count: 0
+    assert_select "p", text: /Nonmatching histories are excluded/
+  end
+
+  test "historical selection does not silently include the final live state" do
+    final = Article.create!(title: "Final review", status: "draft", body: "Body")
+    final.update!(status: "review")
+    born = Article.create!(title: "Born in review", status: "review", body: "Body")
+
+    get_report(status: "review", status_basis: "current")
+    assert_select ".report-card h3", text: final.title
+    assert_select ".report-card h3", text: born.title
+
+    get_report(status: "review", status_basis: "historical")
+    assert_select ".report-card h3", text: final.title, count: 0
+    assert_select ".report-card h3", text: born.title, count: 0
+    assert_select ".selection-explainer", text: /does not make the current state eligible/
+  end
+
+  test "only historical states recorded inside the chosen window are eligible" do
+    travel_to 2.hours.ago do
+      VersionClock.reset!
+      @older = Article.create!(title: "Earlier review", status: "review", body: "Body")
+      @older.update!(status: "approved")
+    end
+    VersionClock.reset!
+    @older.update!(body: "Current edit while approved")
+
+    get_report(window: "15m", status: "review", status_basis: "historical")
+    assert_select ".report-card h3", text: @older.title, count: 0
+
+    get_report(window: "24h", status: "review", status_basis: "historical")
+    assert_select ".report-card h3", text: @older.title
+  end
+
+  test "unknown selection values fall back to current state and any status" do
+    get_report(status: "unknown", status_basis: "unknown")
+    assert_response :success
+    assert_select "select[name='status_basis'] option[value='current'][selected]"
+    assert_select "select[name='status'] option[value='all'][selected]"
+  end
+
+  test "any historical status preserves candidates without a predicate" do
+    Article.create!(title: "No destroy boundary", status: "review", body: "Gone").delete
+    get_report(status_basis: "historical")
+    assert_response :success
+    assert_select ".selection-explainer", text: /no historical predicate/
+    assert_select ".deleted-history", text: /No destroy version is available/
+  end
+
+  test "example dataset preserves existing articles and demonstrates both selections" do
+    assert_difference -> { Article.count }, 2 do
+      post report_examples_url
+    end
+    assert_redirected_to report_url(status_basis: "historical", status: "review", group: "events")
+    assert_equal @article.title, @article.reload.title
+
+    get_report(status_basis: "historical", status: "review", group: "events")
+    assert_select ".report-card h3", text: "History example: moved out of Review"
+    assert_select ".deleted-history h3", text: /History example: deleted in Review/
+    assert_select ".report-card h3", text: "History example: final event entered Review", count: 0
+
+    get_report(status_basis: "current", status: "review")
+    assert_select ".report-card h3", text: "History example: final event entered Review"
+    assert_select ".report-card h3", text: "History example: moved out of Review", count: 0
+  end
+
+  test "normal historical reports select candidates once" do
+    selections = []
+    subscriber = ->(*args) do
+      sql = args.last.fetch(:sql)
+      selections << sql if sql.start_with?('SELECT DISTINCT "versions"."item_id" FROM "versions"')
+    end
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record") do
+      get_report(status: "review", status_basis: "historical")
+    end
+
+    assert_response :success
+    assert_equal 1, selections.length
+    assert_select "a[href*='explain_closure=1'][href*='status_basis=historical']"
+    assert_select "a[href*='explain_closure=1'][href*='status=review']"
   end
 
   private

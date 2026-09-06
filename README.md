@@ -111,6 +111,9 @@ Uncheck every attribute to pass `ignore: []` and compare every scalar field.
 `snapshots: true`, and `close_on: :current`. Switch to individual events to see
 changes before transaction grouping. Retained snapshots supply narrative context;
 the structured disclosure uses `step.to_h(metadata: true)` for source attribution.
+The missing-closing-boundary demonstration is an explicit link: normal report
+requests perform selection once, instead of reifying historical candidates again
+for an error example. The link preserves the window, status, mode, and grouping.
 The report uses `ScopedAnalysis#roots` to reuse the loaded articles in relation
 order instead of querying them a second time.
 A transaction's source boundary describes its first event, not every actor in it.
@@ -120,13 +123,37 @@ The requested graph is explicit: comments and replies, authorships and authors,
 and document metadata. HABTM tags remain available in the studio's endpoint
 comparison because live HABTM activity is unsupported.
 
+Choose **Current state** to filter today's rows, or **Recorded historical states**
+to pass a status predicate through `historical_filter:`. The latter keeps the
+relation broad so articles that moved out of the selected status remain eligible.
+The status picker uses the model's status list, including values no live row holds.
+An unknown mode or status falls back to Current state / Any status.
+
+Use **Add historical status examples** on the report to add three named histories
+without clearing existing articles: a moved-out Review article, a deleted Review
+article, and an article whose final event entered Review. Historical Review finds
+the first two; Current Review finds the final-event example. Each click adds a new
+set, and resetting the studio clears them along with the rest of the demo.
+
+Historical filtering tests recorded **pre-event states inside the selected window**.
+It cannot see a status that appears only in the final live state, even when the
+diff closes on current state. A create-only history has no prior state to test.
+The UI states this limitation, and tests cover final-event, create-only, and
+out-of-window cases. Selecting a root includes its whole activity window, rather
+than just events while it held the chosen status. Any status skips the predicate.
+
 Deleted roots appear separately from the current-status population, even when
-no live articles remain. Their destroy version supplies a historical root for
+no live articles remain. With a historical status predicate, only deleted roots
+with a recorded matching state in the window are included. Their destroy version
+supplies a historical root for
 `activity_timeline`; rows deleted without one are marked unavailable. This
 fallback requests article fields only, inspects at most 25 missing roots per
 report, and states when more remain. It never assumes a deleted article matched
-the live status filter. The 500-root `analyze_scope` limit is a safety ceiling,
-not pagination, and does not bound the missing-root list.
+the live status filter. Without a historical status predicate, the 500-root
+`analyze_scope` limit bounds
+selected live roots, not the missing-root list. With a predicate it counts all
+historical matches, including deleted roots, before live selection. Neither form
+bounds all scanning work; narrow large windows rather than treating it as pagination.
 
 File metadata is assigned in `DocumentRevision#before_save`, so PaperTrail sees
 it during the same save as the file change, under the submitting actor.

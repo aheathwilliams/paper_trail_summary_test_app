@@ -19,8 +19,10 @@ class ReportsController < ApplicationController
   def show
     @window_key = WINDOWS.key?(params[:window]) ? params[:window] : DEFAULT_WINDOW
     @window_label = WINDOWS.fetch(@window_key).fetch(:label)
-    @status = params[:status].presence || ALL_STATUSES
-    @statuses = Article.distinct.order(:status).pluck(:status).compact
+    @status = Article::STATUSES.include?(params[:status]) ? params[:status] : ALL_STATUSES
+    @status_basis = params[:status_basis] == "historical" ? "historical" : "current"
+    # Historical values may have disappeared from the live table entirely.
+    @statuses = Article::STATUSES
     @scope = article_scope.order(:title, :id)
     @window = window_range
     @group = params[:group] == "events" ? nil : :transaction
@@ -32,7 +34,7 @@ class ReportsController < ApplicationController
     @deleted_histories = DeletedArticleHistory.new(
       @unreachable.first(DELETED_LIMIT), within: @window, group: @group
     ).call
-    @incomplete_error = incomplete_window_error
+    @incomplete_error = incomplete_window_error if params[:explain_closure] == "1"
   rescue PaperTrailDiff::Error => error
     @report_error = "#{error.class}: #{error.message}"
   end
@@ -47,10 +49,24 @@ class ReportsController < ApplicationController
   end
 
   def article_scope
-    return Article.all if @status == ALL_STATUSES
+    return Article.all if @status == ALL_STATUSES || historical_status?
 
     Article.where(status: @status)
   end
+
+  def historical_status?
+    @status_basis == "historical"
+  end
+  helper_method :historical_status?
+
+  # demo:code report.filter
+  def historical_filter
+    return unless historical_status? && @status != ALL_STATUSES
+
+    status = @status
+    ->(state) { state.status == status }
+  end
+  # demo:code end
 
   # demo:code report.controller
   # `analyze_scope` takes the relation rather than a list this controller
@@ -76,20 +92,30 @@ class ReportsController < ApplicationController
       close_on: :current,
       activity: true,
       group: @group,
-      snapshots: true
+      snapshots: true,
+      historical_filter: historical_filter
     )
   end
   # demo:code end
 
   # Runs the same window without `close_on:` purely to show what it protects
-  # against. A real report would not do this; the demo does, because the error
-  # is the single most common surprise when reporting on the present.
+  # against, only when explicitly requested. Historical selection reifies
+  # candidates, so repeating it on every report request can double that work.
   def incomplete_window_error
-    PaperTrailDiff.analyze_scope(@scope, within: @window, associations: ASSOCIATIONS, limit: LIMIT)
+    PaperTrailDiff.analyze_scope(
+      @scope, within: @window, associations: ASSOCIATIONS, limit: LIMIT,
+      historical_filter: historical_filter
+    )
     nil
   rescue PaperTrailDiff::IncompleteTimeRangeError => error
     error.message
   end
+
+  def closure_example_params
+    { window: @window_key, status: @status, status_basis: @status_basis,
+      group: @group ? "transaction" : "events", explain_closure: "1" }
+  end
+  helper_method :closure_example_params
 
   helper_method :changed_articles, :quiet_articles, :reported_articles
 

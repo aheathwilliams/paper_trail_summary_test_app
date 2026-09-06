@@ -32,6 +32,13 @@
                         onchange: "this.form.requestSubmit()" %>
       </label>
       <label>
+        <span>Status at</span>
+        <%= form.select :status_basis,
+                        [["Current state", "current"], ["Recorded historical states", "historical"]],
+                        { selected: @status_basis },
+                        onchange: "this.form.requestSubmit()" %>
+      </label>
+      <label>
         <span>Articles matching</span>
         <%= form.select :status,
                         [ [ "Any status", ReportsController::ALL_STATUSES ] ] +
@@ -48,13 +55,38 @@
       <%= form.submit "Run report", class: "button report-submit" %>
     <% end %>
 
-    <p class="lede">
-      The relation picks the population; <code>analyze_scope</code> finds which
-      of its members changed. Note that a relation selects on <strong>current</strong>
-      state, not on state during the window — an article that was
-      <em>draft</em> all week and is <em>approved</em> today will not match
-      <em>draft</em>, even though that is what it was while the window was open.
-    </p>
+    <div class="selection-explainer">
+      <% if historical_status? %>
+        <p class="lede">
+          Historical status selects articles that matched at a <strong>recorded
+          pre-event state inside this window</strong>, even if their current status
+          is different or they have since been deleted. The resulting activity
+          covers their whole selected window, including changes in other statuses.
+        </p>
+        <p class="lede">
+          A status introduced by the final event is not eligible until a later
+          in-window version records it. <code>close_on: :current</code> completes
+          the diff; it does not make the current state eligible for this filter.
+          A newly created article with only its create version has no prior state
+          to test. This is a query of recorded states, not every instant of time.
+        </p>
+        <% if @status != ReportsController::ALL_STATUSES %>
+          <p class="lede">
+            The <%= ReportsController::LIMIT %>-root safety ceiling counts historical
+            matches, including deleted roots, before live selection. Many nonmatches
+            or long histories can still require substantial reconstruction.
+          </p>
+        <% else %>
+          <p class="lede">Any status applies no historical predicate and includes all candidates.</p>
+        <% end %>
+      <% else %>
+        <p class="lede">
+          Current status selects on the live table. An article that was
+          <em>review</em> and is <em>approved</em> today will match Approved.
+          Choose Recorded historical states to look for its earlier status instead.
+        </p>
+      <% end %>
+    </div>
 
     <p class="lede">
       Ending at <strong>now</strong> is the interesting part. A PaperTrail
@@ -71,6 +103,14 @@
       event; one transaction can contain changes by multiple people.
     </p>
 
+    <p class="lede">
+      <%= link_to "Demonstrate a missing closing boundary", report_path(closure_example_params) %>
+      reruns selection once without <code>close_on:</code> to show the error it prevents.
+    </p>
+    <% if params[:explain_closure] == "1" && !@incomplete_error && !@report_error %>
+      <p class="lede">This selection already has sufficient closing boundaries.</p>
+    <% end %>
+
     <% if @incomplete_error %>
       <div class="report-note">
         <p class="eyebrow">Without <code>close_on: :current</code></p>
@@ -80,17 +120,33 @@
     <% end %>
   </section>
 
+  <section class="panel report-scenarios">
+    <p class="eyebrow">Try the selection rules</p>
+    <h2>Moved, deleted, and just changed</h2>
+    <p>
+      Add a small named dataset: an article that moved from Review to Approved,
+      a deleted Review article, and one whose final event entered Review. Existing
+      articles remain in place. Resetting the studio also clears these examples.
+    </p>
+    <%= button_to "Add historical status examples", report_examples_path, class: "button button-secondary" %>
+  </section>
+
   <% if @deleted_histories.present? %>
     <section class="panel report-note">
       <p class="eyebrow">Reached by history, not by the relation</p>
       <p>
         These roots changed inside the window but have no live row left. A
         relation's conditions are evaluated against the live table, so a
-        destroyed root cannot be tested against them at all — they are named
-        rather than dropped.
+        destroyed root cannot be tested against the live status filter. Historical
+        mode can test its recorded states before it is listed here.
       </p>
-      <p>Deleted history is shown separately, regardless of the current status filter.
-        It includes article fields only; historical associations are not requested.</p>
+      <% if historical_status? && @status != ReportsController::ALL_STATUSES %>
+        <p>These deleted articles matched <strong><%= @status.humanize %></strong>
+          at a recorded pre-event state in this window. Nonmatching histories are excluded.</p>
+      <% else %>
+        <p>Deleted history is shown separately, regardless of the current status filter.</p>
+      <% end %>
+      <p>Deleted activity includes article fields only; historical associations are not requested.</p>
       <% @deleted_histories.each do |entry| %>
         <article class="report-card deleted-history">
           <h3><%= entry.title || "History unavailable" %> <code><%= entry.identity.inspect %></code></h3>
@@ -147,6 +203,7 @@
         <% analysis = analysis_for(article) %>
         <article class="report-card">
           <h3><%= link_to article.title, root_path(article_id: article.id) %></h3>
+          <p class="activity-overview">Current status: <strong><%= article.status.humanize %></strong></p>
 
           <p class="activity-overview">
             <%= pluralize(analysis.timeline.length, "checkpoint") %> in this window
@@ -202,7 +259,6 @@
         </p>
       <% end %>
     </section>
-
-    <%= render "demo/source", view: "report" %>
   <% end %>
+  <%= render "demo/source", view: "report" %>
 </main>
