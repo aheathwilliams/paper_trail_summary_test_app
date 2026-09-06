@@ -11,7 +11,7 @@ gem "puma", ">= 5.0"
 
 # Exercise the reviewed APIs before their next RubyGems release.
 gem "paper_trail_diff", git: "https://github.com/aheathwilliams/paper_trail_diff.git",
-  ref: "0293d9e7fd376f42b1b3fb193d57aa5f2fda51c9"
+  ref: "389ad896fbc2ef5942c6ba34b605a1eb0b3f397c"
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show
 # nested, through, and HABTM association diffs as well as scalar diffs.

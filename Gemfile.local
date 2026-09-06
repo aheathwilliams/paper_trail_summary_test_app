@@ -26,7 +26,7 @@ if Dir.exist?(gem_working_copy)
   gem "paper_trail_diff", path: gem_working_copy
 else
   gem "paper_trail_diff", git: "https://github.com/aheathwilliams/paper_trail_diff.git",
-    ref: "0293d9e7fd376f42b1b3fb193d57aa5f2fda51c9"
+    ref: "389ad896fbc2ef5942c6ba34b605a1eb0b3f397c"
 end
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show

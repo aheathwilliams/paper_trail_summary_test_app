@@ -2,9 +2,10 @@
 
 A small Rails application for exercising
 [`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) in a
-realistic integration. This branch pins the exact gem commit from
-[PR #13](https://github.com/aheathwilliams/paper_trail_diff/pull/13) in `Gemfile`
-and `Gemfile.lock`, including the new batch activity options. No sibling checkout
+realistic integration. `Gemfile` and `Gemfile.lock` pin the merged gem revision
+containing [PR #13](https://github.com/aheathwilliams/paper_trail_diff/pull/13)
+and [PR #12](https://github.com/aheathwilliams/paper_trail_diff/pull/12), including
+batch activity options and historical selection. No sibling checkout
 is required. `Gemfile.local` optionally uses the gem working copy beside this app.
 
 The demo creates an article history with scalar, nested, through-association,
@@ -110,6 +111,8 @@ Uncheck every attribute to pass `ignore: []` and compare every scalar field.
 `snapshots: true`, and `close_on: :current`. Switch to individual events to see
 changes before transaction grouping. Retained snapshots supply narrative context;
 the structured disclosure uses `step.to_h(metadata: true)` for source attribution.
+The report uses `ScopedAnalysis#roots` to reuse the loaded articles in relation
+order instead of querying them a second time.
 A transaction's source boundary describes its first event, not every actor in it.
 Edits that cancel each other remain visible even when the net diff is empty.
 

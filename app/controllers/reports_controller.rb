@@ -21,12 +21,14 @@ class ReportsController < ApplicationController
     @window_label = WINDOWS.fetch(@window_key).fetch(:label)
     @status = params[:status].presence || ALL_STATUSES
     @statuses = Article.distinct.order(:status).pluck(:status).compact
-    @scope = article_scope
+    @scope = article_scope.order(:title, :id)
     @window = window_range
     @group = params[:group] == "events" ? nil : :transaction
 
-    @results, @unreachable = build_report
-    @articles = @scope.where(id: @results.keys.map(&:last)).order(:title, :id).to_a
+    report = build_report
+    @results = report.analyses
+    @unreachable = report.unreachable
+    @articles = report.roots
     @deleted_histories = DeletedArticleHistory.new(
       @unreachable.first(DELETED_LIMIT), within: @window, group: @group
     ).call

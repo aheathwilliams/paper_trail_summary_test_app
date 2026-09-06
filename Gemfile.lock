@@ -1,7 +1,7 @@
 GIT
   remote: https://github.com/aheathwilliams/paper_trail_diff.git
-  revision: 0293d9e7fd376f42b1b3fb193d57aa5f2fda51c9
-  ref: 0293d9e7fd376f42b1b3fb193d57aa5f2fda51c9
+  revision: 389ad896fbc2ef5942c6ba34b605a1eb0b3f397c
+  ref: 389ad896fbc2ef5942c6ba34b605a1eb0b3f397c
   specs:
     paper_trail_diff (0.12.0)
       paper_trail (>= 16, < 18)
