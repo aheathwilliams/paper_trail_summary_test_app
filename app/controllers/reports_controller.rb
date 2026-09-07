@@ -1,4 +1,4 @@
-# "What changed across every article recently?" -- the question `analyze_many`
+# "What changed across every article recently?" -- the question `report`
 # and a wall-clock window exist for, and the one the single-article studio on
 # the root page cannot answer.
 class ReportsController < ApplicationController
@@ -32,7 +32,7 @@ class ReportsController < ApplicationController
     @unreachable = report.unreachable
     @articles = report.roots
     @deleted_histories = DeletedArticleHistory.new(
-      @unreachable.first(DELETED_LIMIT), within: @window, group: @group
+      report.deleted.first(DELETED_LIMIT).to_h
     ).call
     @incomplete_error = incomplete_window_error if params[:explain_closure] == "1"
   rescue PaperTrailDiff::Error => error
@@ -63,34 +63,21 @@ class ReportsController < ApplicationController
   def historical_filter
     return unless historical_status? && @status != ALL_STATUSES
 
-    status = @status
-    ->(state) { state.status == status }
+    { status: @status }
   end
   # demo:code end
 
   # demo:code report.controller
-  # `analyze_scope` takes the relation rather than a list this controller
-  # assembled. It finds the roots whose history moved inside the window, loads
-  # them, and analyzes them -- the selection this
-  # gem already performs, which a caller would otherwise reimplement.
-  #
-  # `close_on: :current` is what makes a window ending *now* answerable. A
-  # PaperTrail version stores the state before its own event, so the final
-  # change inside the window has no later version to reveal it; without this
-  # the call raises IncompleteTimeRangeError rather than under-reporting.
-  #
-  # `unreachable` names roots that changed in the window but have no live row
-  # left. A relation's conditions are evaluated against the live table, so a
-  # destroyed root cannot be tested against them at all -- reporting them keeps
-  # a deletions audit from quietly coming up short.
+  # `report` returns recent activity through now; it handles the live ending.
+  # Deleted histories are loaded as a separate batch because current SQL filters
+  # cannot establish whether a deleted row matched the live population.
   def build_report
-    PaperTrailDiff.analyze_scope(
+    PaperTrailDiff.report(
       @scope,
-      within: @window,
+      since: @window.begin,
       associations: ASSOCIATIONS,
       limit: LIMIT,
-      close_on: :current,
-      activity: true,
+      include_deleted: true,
       group: @group,
       snapshots: true,
       historical_filter: historical_filter
@@ -99,8 +86,8 @@ class ReportsController < ApplicationController
   # demo:code end
 
   # Runs the same window without `close_on:` purely to show what it protects
-  # against, only when explicitly requested. Historical selection reifies
-  # candidates, so repeating it on every report request can double that work.
+  # against, only when explicitly requested. Historical selection reads candidate
+  # states, so repeating it on every report request can double that work.
   def incomplete_window_error
     PaperTrailDiff.analyze_scope(
       @scope, within: @window, associations: ASSOCIATIONS, limit: LIMIT,

@@ -1,28 +1,20 @@
-# Missing rows cannot be tested against a live relation's status filter. Keep
-# their history separate and explicit, including rows with no destroy version.
+# Presentation data from the gem's batch result; this class performs no queries.
 class DeletedArticleHistory
   Entry = Data.define(:identity, :title, :steps)
 
-  def initialize(identities, within:, group:)
-    @identities = identities
-    @within = within
-    @group = group
+  def initialize(analyses)
+    @analyses = analyses
   end
 
   # demo:code report.deleted
   def call
-    @identities.map do |identity|
-      type, id = identity
-      version = Article.paper_trail.version_class
-        .where(item_type: type, item_id: id, event: "destroy")
-        .reorder(created_at: :desc, id: :desc).first
-      root = version&.reify
-      steps = if root
-        PaperTrailDiff.activity_timeline(
-          root, within: @within, group: @group, snapshots: true
-        ).reject(&:empty?)
-      end
-      Entry.new(identity: identity, title: root&.title, steps: steps)
+    @analyses.map do |identity, analysis|
+      snapshot = analysis&.to_snapshot || analysis&.from_snapshot
+      Entry.new(
+        identity: identity,
+        title: snapshot&.attributes&.fetch("title", nil),
+        steps: analysis&.activity_timeline&.reject(&:empty?)
+      )
     end
   end
   # demo:code end

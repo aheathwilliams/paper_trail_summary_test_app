@@ -2,11 +2,13 @@
 
 A small Rails application for exercising
 [`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) in a
-realistic integration. `Gemfile` and `Gemfile.lock` pin the merged gem revision
-containing [PR #13](https://github.com/aheathwilliams/paper_trail_diff/pull/13)
-and [PR #12](https://github.com/aheathwilliams/paper_trail_diff/pull/12), including
-batch activity options and historical selection. No sibling checkout
-is required. `Gemfile.local` optionally uses the gem working copy beside this app.
+realistic integration. `Gemfile` and `Gemfile.lock` pin gem revision `fb076a4`,
+which adds recent reports, batched deleted history, and bounded attribute filters
+on top of [PR #13](https://github.com/aheathwilliams/paper_trail_diff/pull/13)
+and [PR #12](https://github.com/aheathwilliams/paper_trail_diff/pull/12).
+Until that gem commit is pushed, use `BUNDLE_GEMFILE=Gemfile.local` with the gem
+working copy beside this app. Once the revision is available remotely, the
+default bundle needs no sibling checkout.
 
 The demo creates an article history with scalar, nested, through-association,
 and HABTM changes. You can create and edit articles, comments and nested
@@ -107,8 +109,9 @@ Uncheck every attribute to pass `ignore: []` and compare every scalar field.
 
 ## Recent activity report
 
-`/report` uses `analyze_scope` with `activity: true`, `group: :transaction`,
-`snapshots: true`, and `close_on: :current`. Switch to individual events to see
+`/report` uses `PaperTrailDiff.report` with `since:`, `include_deleted: true`,
+`group: :transaction`, and `snapshots: true`. The gem supplies activity output and
+the current ending. Switch to individual events to see
 changes before transaction grouping. Retained snapshots supply narrative context;
 the structured disclosure uses `step.to_h(metadata: true)` for source attribution.
 The missing-closing-boundary demonstration is an explicit link: normal report
@@ -122,9 +125,12 @@ Edits that cancel each other remain visible even when the net diff is empty.
 The requested graph is explicit: comments and replies, authorships and authors,
 and document metadata. HABTM tags remain available in the studio's endpoint
 comparison because live HABTM activity is unsupported.
+Selection requires an article version in the window: changing only a child of
+an otherwise quiet article does not bring that article into the report.
 
 Choose **Current state** to filter today's rows, or **Recorded historical states**
-to pass a status predicate through `historical_filter:`. The latter keeps the
+to pass `{ status: selected_status }` through `historical_filter:`. This reads
+recorded attributes without reifying every candidate. The latter keeps the
 relation broad so articles that moved out of the selected status remain eligible.
 The status picker uses the model's status list, including values no live row holds.
 An unknown mode or status falls back to Current state / Any status.
@@ -144,16 +150,16 @@ than just events while it held the chosen status. Any status skips the predicate
 
 Deleted roots appear separately from the current-status population, even when
 no live articles remain. With a historical status predicate, only deleted roots
-with a recorded matching state in the window are included. Their destroy version
-supplies a historical root for
-`activity_timeline`; rows deleted without one are marked unavailable. This
-fallback requests article fields only, inspects at most 25 missing roots per
-report, and states when more remain. It never assumes a deleted article matched
-the live status filter. Without a historical status predicate, the 500-root
-`analyze_scope` limit bounds
-selected live roots, not the missing-root list. With a predicate it counts all
-historical matches, including deleted roots, before live selection. Neither form
-bounds all scanning work; narrow large windows rather than treating it as pagination.
+with a recorded matching state in the window are included. `report.deleted`
+provides their analyses in one batch, including the same selected associations
+as the live report. Rows without destroy history are marked unavailable. The
+presenter performs no queries or reification and displays the first 25 missing
+roots, with a notice when more remain. It never assumes a deleted article matched
+the live status filter. The 500-root ceiling covers live and missing roots
+together; historical selection also limits all matches before live filtering.
+Historical filtering has a separate default budget of 10,000 loaded versions.
+These ceilings do not bound arbitrary history reconstruction work; narrow large
+windows rather than treating the limits as pagination.
 
 File metadata is assigned in `DocumentRevision#before_save`, so PaperTrail sees
 it during the same save as the file change, under the submitting actor.

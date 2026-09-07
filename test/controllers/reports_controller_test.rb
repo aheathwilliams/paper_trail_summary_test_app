@@ -90,7 +90,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_select ".source-snippet figcaption code", { text: "app/controllers/reports_controller.rb" }, response.body
-    assert_select ".source-snippet", html: /analyze_scope/
+    assert_select ".source-snippet", text: /PaperTrailDiff\.report/
   end
   test "retains narrative context and serializes source metadata for grouped activity" do
     get_report(group: "transaction")
@@ -268,6 +268,31 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_equal 1, selections.length
     assert_select "a[href*='explain_closure=1'][href*='status_basis=historical']"
     assert_select "a[href*='explain_closure=1'][href*='status=review']"
+  end
+
+  test "deleted histories do not add queries per article" do
+    add_deleted = -> do
+      article = Article.create!(title: "Batch deletion", status: "review", body: "Body")
+      article.comments.create!(body: "Comment before deletion", author: "Example author")
+      article.destroy!
+    end
+    count_queries = -> do
+      count = 0
+      callback = ->(*args) do
+        payload = args.last
+        count += 1 unless %w[SCHEMA TRANSACTION].include?(payload[:name])
+      end
+      ActiveSupport::Notifications.subscribed(callback, "sql.active_record") { get_report }
+      assert_response :success
+      count
+    end
+    add_deleted.call
+    get_report
+    one = count_queries.call
+    4.times { add_deleted.call }
+
+    assert_equal one, count_queries.call
+    assert_select ".deleted-history", count: 5
   end
 
   private
