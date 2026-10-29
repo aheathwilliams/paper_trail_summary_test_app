@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   test:
-    name: Rails tests against the pinned gem revision
+    name: Rails tests against the released gem
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
