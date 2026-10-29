@@ -12,6 +12,28 @@ class NarrativeTimeline
     def to_s = segments.map(&:text).join
   end
 
+  MEMBERSHIP_KINDS = %i[record_added record_removed].freeze
+  LABEL_ATTRIBUTES = %w[label name title].freeze
+  # `credited_as` humanizes to "credited as", which reads badly before "credit".
+  CREDIT_LABELS = { "credited_as" => "byline" }.freeze
+
+  Credits = Data.define(:joins, :authors) do
+    def role_for(kind, author_id)
+      joins[[ kind, author_id ]]&.attributes&.[]("role").presence
+    end
+
+    def narrated_with_author?(kind, join)
+      authors.include?([ kind, Credits.author_id(join) ])
+    end
+
+    # A selected `authorships.author` path nests the author in the join and
+    # leaves its foreign key out of the attributes.
+    def self.author_id(join)
+      join.associations["author"]&.records&.first&.id || join.attributes["author_id"]
+    end
+  end
+  private_constant :Credits
+
   Detail = Data.define(:label, :body, :tone)
   Item = Data.define(:kind, :sentence, :details)
   Event = Data.define(:boundary, :visible_by, :items)
@@ -23,7 +45,8 @@ class NarrativeTimeline
   def call
     @steps.filter_map do |step|
       entries = narrative_entries(step.diff)
-      items = entries.filter_map { |entry| item_for(entry, step, entries) }
+      credits = authorship_credits(entries)
+      items = entries.filter_map { |entry| item_for(entry, step, credits) }
       next if items.empty?
 
       Event.new(
@@ -49,16 +72,14 @@ class NarrativeTimeline
     [ entry.kind, record&.type, record&.id, entry.attribute, value ]
   end
 
-  def item_for(entry, step, entries)
-    return if duplicate_authorship_membership?(entry, entries)
-
+  def item_for(entry, step, credits)
     case entry.kind
     when :attribute_changed
       attribute_item(entry, step)
     when :record_added
-      membership_item(entry, step, :added)
+      membership_item(entry, step, :added, credits)
     when :record_removed
-      membership_item(entry, step, :removed)
+      membership_item(entry, step, :removed, credits)
     when :record_presence_changed
       presence_item(entry, step.source_boundary)
     when :relationship_added, :relationship_removed, :relationship_replaced
@@ -66,17 +87,23 @@ class NarrativeTimeline
     end
   end
 
-  # A join row and the record it credits both surface as additions, so the join
-  # is dropped in favour of the sentence about the author. That pairing is
-  # one-to-one only because authorships are unique per [article, author]; drop
-  # that index and this would silently swallow the extra credits.
-  def duplicate_authorship_membership?(entry, entries)
-    return false unless entry.record&.type == "Authorship"
-    return false unless %i[record_added record_removed].include?(entry.kind)
+  # Adding an author adds the author and the join row that credits them, so
+  # both arrive in one step. The join rows are indexed by the author they
+  # credit: the sentence about that author carries the join's role, and only a
+  # join with no author sentence of its own is narrated separately.
+  def authorship_credits(entries)
+    joins = {}
+    authors = Set.new
+    entries.each do |entry|
+      next unless MEMBERSHIP_KINDS.include?(entry.kind)
 
-    entries.any? do |candidate|
-      candidate.kind == entry.kind && candidate.record&.type == "Author"
+      case entry.value.type
+      when "Authorship" then joins[[ entry.kind, Credits.author_id(entry.value) ]] = entry.value
+      when "Author" then authors << [ entry.kind, entry.value.id ]
+      end
     end
+
+    Credits.new(joins:, authors:)
   end
 
   def attribute_item(entry, step)
@@ -96,11 +123,11 @@ class NarrativeTimeline
     when "Author"
       author_attribute_item(entry.attribute, change, actor, record)
     when "Authorship"
-      authorship_attribute_item(entry.attribute, change, actor, record)
+      authorship_attribute_item(entry, change, actor, record, step)
     when "Tag"
       tag_attribute_item(entry.attribute, change, actor, record)
     else
-      changed_attribute_item(actor, type, entry.attribute, change)
+      changed_attribute_item(actor, type, entry.attribute, change, record)
     end
   end
 
@@ -140,8 +167,9 @@ class NarrativeTimeline
     details = []
     details << detail("#{recipient}'s comment", parent_body, :context) if parent_body
     details.concat(change_details(entry.attribute, change))
+    addressee = addressee(recipient, responder, actor)
 
-    item(:reply_changed, "#{actor} edited #{action} to #{recipient}.", details)
+    item(:reply_changed, "#{actor} edited #{action} to #{addressee}.", details)
   end
 
   def author_attribute_item(attribute, change, actor, record)
@@ -156,14 +184,29 @@ class NarrativeTimeline
     item(:author_changed, sentence, change_details(attribute, change))
   end
 
-  def authorship_attribute_item(attribute, change, actor, record)
-    author = record&.associations&.[]("author")&.records&.first
-    name = attribute_of(author, "name") || "an author"
+  def authorship_attribute_item(entry, change, actor, record, step)
+    name = attribute_of(credited_author(entry, record, step), "name") || "an author"
+    possessive = actor == name ? "their own" : "#{name}'s"
+    label = CREDIT_LABELS.fetch(entry.attribute, entry.attribute.humanize.downcase)
     sentence = phrase(
-      "#{actor} changed #{name}'s ", code(attribute.humanize.downcase), " credit from ",
+      "#{actor} changed #{possessive} ", code(label), " credit from ",
       code(change.from), " to ", code(change.to), "."
     )
     item(:authorship_changed, sentence)
+  end
+
+  # The join row reaches the author three ways, depending on the path that
+  # surfaced it: nested under it (`authorships.author`), above it
+  # (`authors.authorships`), or only as `author_id`.
+  def credited_author(entry, record, step)
+    nested = record&.associations&.[]("author")&.records&.first
+    return nested if nested
+
+    depth = entry.record_path.rindex { |reference| reference.type == "Author" }
+    return record_in(step.from_snapshot, entry.association_path.first(depth + 1), entry.record_path) if depth
+
+    author_id = record && Credits.author_id(record)
+    step.from_snapshot&.associations&.[]("authors")&.records&.find { |author| author.id == author_id }
   end
 
   def tag_attribute_item(attribute, change, actor, record)
@@ -172,14 +215,15 @@ class NarrativeTimeline
     item(:tag_changed, sentence, change_details(attribute, change))
   end
 
-  def changed_attribute_item(actor, type, attribute, change)
-    sentence = phrase(
-      "#{actor} changed ", code(attribute.humanize.downcase), " on #{type.underscore.humanize.downcase}."
-    )
+  def changed_attribute_item(actor, type, attribute, change, record)
+    noun = type.underscore.humanize.downcase
+    label = record_label(record)
+    target = label ? [ " on the ", code(label), " #{noun}." ] : [ " on #{noun}." ]
+    sentence = phrase("#{actor} changed ", code(attribute.humanize.downcase), *target)
     item(:attribute_changed, sentence, change_details(attribute, change))
   end
 
-  def membership_item(entry, step, state)
+  def membership_item(entry, step, state, credits)
     boundary = step.source_boundary
     snapshot = entry.value
     actor = actor_name(boundary)
@@ -190,9 +234,9 @@ class NarrativeTimeline
     when "Reply"
       reply_membership_item(entry, snapshot, actor, state, step)
     when "Author"
-      author_membership_item(snapshot, actor, state)
+      author_membership_item(snapshot, actor, state, credits.role_for(entry.kind, snapshot.id))
     when "Authorship"
-      authorship_membership_item(snapshot, actor, state)
+      authorship_membership_item(snapshot, actor, state) unless credits.narrated_with_author?(entry.kind, snapshot)
     when "Tag"
       tag_membership_item(snapshot, actor, state)
     else
@@ -226,33 +270,41 @@ class NarrativeTimeline
     label = state == :added ? "#{responder}'s reply" : "Removed reply by #{responder}"
     tone = state == :added ? :added : :removed
     details << detail(label, snapshot.attributes["body"], tone)
+    addressee = addressee(recipient, responder, actor)
     sentence = if state == :added
-      actor == responder ? "#{responder} replied to #{recipient}." :
-        "#{actor} added a reply from #{responder} to #{recipient}."
+      actor == responder ? "#{responder} replied to #{addressee}." :
+        "#{actor} added a reply from #{responder} to #{addressee}."
     elsif actor == responder
-      "#{responder} removed their reply to #{recipient}."
+      "#{responder} removed their reply to #{addressee}."
     else
-      "#{actor} removed #{responder}'s reply to #{recipient}."
+      "#{actor} removed #{responder}'s reply to #{addressee}."
     end
 
     item("reply_#{state}".to_sym, sentence, details)
   end
 
-  def author_membership_item(snapshot, actor, state)
+  def author_membership_item(snapshot, actor, state, role)
     name = snapshot.attributes["name"].presence || "an unnamed author"
-    verb = state == :added ? "added" : "removed"
-    direction = state == :added ? "to" : "from"
+    subject = reflexive(actor, name)
     details = []
     if snapshot.attributes["bio"].present?
       details << detail("About #{name}", snapshot.attributes["bio"], state)
     end
 
-    item("author_#{state}".to_sym, "#{actor} #{verb} #{name} as an author #{direction} the article.", details)
+    sentence = if state == :removed
+      phrase("#{actor} removed #{subject} as an author from the article.")
+    elsif role
+      phrase("#{actor} added #{subject} as an author to the article, credited as ", code(role), ".")
+    else
+      phrase("#{actor} added #{subject} as an author to the article.")
+    end
+
+    item("author_#{state}".to_sym, sentence, details)
   end
 
   def authorship_membership_item(snapshot, actor, state)
     author = snapshot.associations["author"]&.records&.first
-    name = author&.attributes&.fetch("name", nil).presence || "an author"
+    name = reflexive(actor, author&.attributes&.fetch("name", nil).presence || "an author")
     role = snapshot.attributes["role"].presence
     verb = state == :added ? "credited" : "removed the credit for"
     suffix = role ? [ " as ", code(role) ] : []
@@ -275,7 +327,15 @@ class NarrativeTimeline
 
   def generic_membership_item(snapshot, actor, state)
     verb = state == :added ? "added" : "removed"
-    item("record_#{state}".to_sym, "#{actor} #{verb} #{snapshot.type} ##{snapshot.id}.")
+    noun = snapshot.type.underscore.humanize.downcase
+    label = record_label(snapshot)
+    sentence = if label
+      phrase("#{actor} #{verb} the ", code(label), " #{noun}.")
+    else
+      phrase("#{actor} #{verb} #{noun} ##{snapshot.id}.")
+    end
+
+    item("record_#{state}".to_sym, sentence)
   end
 
   def presence_item(entry, boundary)
@@ -334,6 +394,22 @@ class NarrativeTimeline
 
   def actor_name(boundary)
     boundary.whodunnit.to_s.presence || "Someone"
+  end
+
+  # "Luis Ortega added Luis Ortega" reads like a bug, not a self-action.
+  def reflexive(actor, name)
+    actor == name ? "themselves" : name
+  end
+
+  # Likewise "Jon Bell replied to Jon Bell": the reply is to their own comment.
+  def addressee(recipient, responder, actor)
+    return recipient unless recipient == responder
+
+    actor == responder ? "their own comment" : "#{recipient}'s own comment"
+  end
+
+  def record_label(snapshot)
+    LABEL_ATTRIBUTES.filter_map { |name| attribute_of(snapshot, name) }.first
   end
 
   def change_details(attribute, change)
