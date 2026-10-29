@@ -264,6 +264,42 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     assert_operator just_jon, :>, 0
   end
 
+  test "lists every event one person made, including edits below the article" do
+    versions = @article.versions.order(:id)
+    params = { article_id: @article.id, from_id: versions.first.id, to_id: versions.last.id }
+
+    get root_url, params: params
+    by_jon = css_select(".result-panel--visible .visible-event-step .activity-boundary small")
+      .count { |label| label.text.include?("by Jon Bell") }
+
+    get root_url, params: params.merge(whodunnit: "Jon Bell")
+    events = css_select(".result-panel--visible .visible-event-step .activity-boundary small")
+
+    # Jon edited the article once and its children several times. Filtering
+    # the root versions would have kept only the one article edit.
+    assert_operator by_jon, :>, versions.where(whodunnit: "Jon Bell").count
+    assert_equal by_jon, events.length
+    assert events.all? { |label| label.text.include?("by Jon Bell") }
+    assert_select ".result-panel--narratives .filter-note", text: /Jon Bell/
+  end
+
+  test "offers people who changed only comments or replies" do
+    versions = @article.versions.order(:id)
+    assert_not versions.exists?(whodunnit: "Luis Ortega")
+
+    get root_url, params: {
+      article_id: @article.id, from_id: versions.first.id, to_id: versions.last.id,
+      whodunnit: "Luis Ortega"
+    }
+
+    assert_response :success
+    assert_select ".author-filter option[selected]", text: "Luis Ortega"
+    assert_select ".result-panel--checkpoints .timeline-step", count: 0
+    events = css_select(".result-panel--visible .visible-event-step .activity-boundary small")
+    assert_predicate events, :any?
+    assert events.all? { |label| label.text.include?("by Luis Ortega") }
+  end
+
   test "attributes a filtered transition to what that person actually changed" do
     # Maya Chen renames the article, and someone else edits it afterwards. The
     # transition reported for Maya must end at the version immediately after
@@ -319,9 +355,11 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     }
 
     assert_response :success
-    assert_select ".result-panel--activity .activity-step", count: 1
-    assert_select ".result-panel--activity .activity-boundary small", text: /Selected editor/
-    assert_select ".result-panel--activity .after", text: /First edit/
-    assert_select ".result-panel--activity .after", text: /Later edit/, count: 0
+    # All activity stays the full chain; the filter applies to the events.
+    assert_select ".result-panel--activity .activity-step", count: 2
+    assert_select ".result-panel--visible .visible-event-step", count: 1
+    assert_select ".result-panel--visible .activity-boundary small", text: /Selected editor/
+    assert_select ".result-panel--visible .after", text: /First edit/
+    assert_select ".result-panel--visible .after", text: /Later edit/, count: 0
   end
 end
