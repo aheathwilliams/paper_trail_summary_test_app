@@ -4,6 +4,14 @@
 class NarrativeTimeline
   MissingSnapshot = Class.new(StandardError)
 
+  # A sentence is prose with record values set apart as segments, so the view
+  # never has to recover which words are data. A title containing a backtick
+  # stays one value instead of breaking the markup around it.
+  Segment = Data.define(:text, :code)
+  Sentence = Data.define(:segments) do
+    def to_s = segments.map(&:text).join
+  end
+
   Detail = Data.define(:label, :body, :tone)
   Item = Data.define(:kind, :sentence, :details)
   Event = Data.define(:boundary, :visible_by, :items)
@@ -99,13 +107,13 @@ class NarrativeTimeline
   def article_attribute_item(attribute, change, actor)
     sentence = case attribute
     when "status"
-      "#{actor} changed the status from `#{change.from}` to `#{change.to}`."
+      phrase("#{actor} changed the status from ", code(change.from), " to ", code(change.to), ".")
     when "title"
       "#{actor} changed the article title."
     when "body"
       "#{actor} revised the article body."
     else
-      "#{actor} changed the article's `#{attribute.humanize.downcase}`."
+      phrase("#{actor} changed the article's ", code(attribute.humanize.downcase), ".")
     end
 
     item(:attribute_changed, sentence, change_details(attribute, change))
@@ -117,7 +125,7 @@ class NarrativeTimeline
     sentence = if entry.attribute == "body"
       "#{actor} #{action}."
     else
-      "#{actor} changed `#{entry.attribute.humanize.downcase}` on the comment by #{author}."
+      phrase("#{actor} changed ", code(entry.attribute.humanize.downcase), " on the comment by #{author}.")
     end
 
     item(:comment_changed, sentence, change_details(entry.attribute, change))
@@ -142,7 +150,7 @@ class NarrativeTimeline
     sentence = if attribute == "bio"
       "#{actor} updated #{subject}."
     else
-      "#{actor} changed `#{attribute.humanize.downcase}` on #{subject}."
+      phrase("#{actor} changed ", code(attribute.humanize.downcase), " on #{subject}.")
     end
 
     item(:author_changed, sentence, change_details(attribute, change))
@@ -151,19 +159,23 @@ class NarrativeTimeline
   def authorship_attribute_item(attribute, change, actor, record)
     author = record&.associations&.[]("author")&.records&.first
     name = attribute_of(author, "name") || "an author"
-    sentence = "#{actor} changed #{name}'s `#{attribute.humanize.downcase}` credit " \
-      "from `#{change.from}` to `#{change.to}`."
+    sentence = phrase(
+      "#{actor} changed #{name}'s ", code(attribute.humanize.downcase), " credit from ",
+      code(change.from), " to ", code(change.to), "."
+    )
     item(:authorship_changed, sentence)
   end
 
   def tag_attribute_item(attribute, change, actor, record)
     name = attribute_of(record, "name") || "an unnamed tag"
-    sentence = "#{actor} changed `#{attribute.humanize.downcase}` on the `#{name}` tag."
+    sentence = phrase("#{actor} changed ", code(attribute.humanize.downcase), " on the ", code(name), " tag.")
     item(:tag_changed, sentence, change_details(attribute, change))
   end
 
   def changed_attribute_item(actor, type, attribute, change)
-    sentence = "#{actor} changed `#{attribute.humanize.downcase}` on #{type.underscore.humanize.downcase}."
+    sentence = phrase(
+      "#{actor} changed ", code(attribute.humanize.downcase), " on #{type.underscore.humanize.downcase}."
+    )
     item(:attribute_changed, sentence, change_details(attribute, change))
   end
 
@@ -243,9 +255,9 @@ class NarrativeTimeline
     name = author&.attributes&.fetch("name", nil).presence || "an author"
     role = snapshot.attributes["role"].presence
     verb = state == :added ? "credited" : "removed the credit for"
-    suffix = role ? " as `#{role}`" : ""
+    suffix = role ? [ " as ", code(role) ] : []
 
-    item("authorship_#{state}".to_sym, "#{actor} #{verb} #{name}#{suffix}.")
+    item("authorship_#{state}".to_sym, phrase("#{actor} #{verb} #{name}", *suffix, "."))
   end
 
   def tag_membership_item(snapshot, actor, state)
@@ -254,10 +266,11 @@ class NarrativeTimeline
     direction = state == :added ? "to" : "from"
     details = []
     if snapshot.attributes["description"].present?
-      details << detail("About `#{name}`", snapshot.attributes["description"], state)
+      details << detail(phrase("About ", code(name)), snapshot.attributes["description"], state)
     end
 
-    item("tag_#{state}".to_sym, "#{actor} #{verb} the `#{name}` tag #{direction} the article.", details)
+    sentence = phrase("#{actor} #{verb} the ", code(name), " tag #{direction} the article.")
+    item("tag_#{state}".to_sym, sentence, details)
   end
 
   def generic_membership_item(snapshot, actor, state)
@@ -270,13 +283,12 @@ class NarrativeTimeline
     actor = actor_name(boundary)
     snapshot = change.to || change.from
     title = snapshot&.attributes&.fetch("title", nil).presence
+    named = title ? [ " ", code(title) ] : []
 
     if change.to
-      sentence = "#{actor} created the article#{" `#{title}`" if title}."
-      item(:article_created, sentence)
+      item(:article_created, phrase("#{actor} created the article", *named, "."))
     else
-      sentence = "#{actor} removed the article#{" `#{title}`" if title}."
-      item(:article_removed, sentence)
+      item(:article_removed, phrase("#{actor} removed the article", *named, "."))
     end
   end
 
@@ -333,10 +345,23 @@ class NarrativeTimeline
   end
 
   def detail(label, body, tone)
-    Detail.new(label:, body:, tone:)
+    Detail.new(label: phrase(label), body:, tone:)
   end
 
   def item(kind, sentence, details = [])
-    Item.new(kind:, sentence:, details: details.freeze)
+    Item.new(kind:, sentence: phrase(sentence), details: details.freeze)
+  end
+
+  # Plain strings are prose and `code` marks a value. A finished sentence
+  # passes through unchanged, so a builder can hand over either.
+  def phrase(*parts)
+    return parts.first if parts.one? && parts.first.is_a?(Sentence)
+
+    segments = parts.map { |part| part.is_a?(Segment) ? part : Segment.new(text: part.to_s, code: false) }
+    Sentence.new(segments: segments.freeze)
+  end
+
+  def code(value)
+    Segment.new(text: value.to_s, code: true)
   end
 end

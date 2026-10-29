@@ -64,12 +64,8 @@ module DemoHelper
   end
 
   def narrative_sentence(sentence)
-    segments = sentence.to_s.split(/(`[^`]*`)/).map do |segment|
-      if segment.start_with?("`") && segment.end_with?("`")
-        content_tag(:code, segment[1...-1])
-      else
-        segment
-      end
+    segments = sentence.segments.map do |segment|
+      segment.code ? content_tag(:code, segment.text) : segment.text
     end
 
     safe_join(segments)
