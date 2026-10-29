@@ -34,7 +34,6 @@ class ReportsController < ApplicationController
     @deleted_histories = DeletedArticleHistory.new(
       report.deleted.first(DELETED_LIMIT).to_h
     ).call
-    @incomplete_error = incomplete_window_error if params[:explain_closure] == "1"
   rescue PaperTrailDiff::Error => error
     @report_error = "#{error.class}: #{error.message}"
   end
@@ -68,7 +67,7 @@ class ReportsController < ApplicationController
   # demo:code end
 
   # demo:code report.controller
-  # `report` returns recent activity through now; it handles the live ending.
+  # `report` returns recent activity through now, closing on the live record.
   # Deleted histories are loaded as a separate batch because current SQL filters
   # cannot establish whether a deleted row matched the live population.
   def build_report
@@ -84,25 +83,6 @@ class ReportsController < ApplicationController
     )
   end
   # demo:code end
-
-  # Runs the same window without `close_on:` purely to show what it protects
-  # against, only when explicitly requested. Historical selection reads candidate
-  # states, so repeating it on every report request can double that work.
-  def incomplete_window_error
-    PaperTrailDiff.analyze_scope(
-      @scope, within: @window, associations: ASSOCIATIONS, limit: LIMIT,
-      historical_filter: historical_filter
-    )
-    nil
-  rescue PaperTrailDiff::IncompleteTimeRangeError => error
-    error.message
-  end
-
-  def closure_example_params
-    { window: @window_key, status: @status, status_basis: @status_basis,
-      group: @group ? "transaction" : "events", explain_closure: "1" }
-  end
-  helper_method :closure_example_params
 
   helper_method :changed_articles, :quiet_articles, :reported_articles
 

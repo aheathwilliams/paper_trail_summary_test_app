@@ -9,9 +9,7 @@ gem "sqlite3", ">= 2.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
-# Exercise the reviewed APIs before their next RubyGems release.
-gem "paper_trail_diff", git: "https://github.com/aheathwilliams/paper_trail_diff.git",
-  ref: "f6a4ae2f1e8078602280017313b0d9492e827931"
+gem "paper_trail_diff", "~> 0.13.1"
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show
 # nested, through, and HABTM association diffs as well as scalar diffs.

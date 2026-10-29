@@ -25,8 +25,7 @@ gem_working_copy = File.expand_path("../paper_trail_summary", __dir__)
 if Dir.exist?(gem_working_copy)
   gem "paper_trail_diff", path: gem_working_copy
 else
-  gem "paper_trail_diff", git: "https://github.com/aheathwilliams/paper_trail_diff.git",
-    ref: "f6a4ae2f1e8078602280017313b0d9492e827931"
+  gem "paper_trail_diff", "~> 0.13.1"
 end
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show

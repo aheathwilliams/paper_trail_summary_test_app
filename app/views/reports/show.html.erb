@@ -57,17 +57,16 @@
     <div class="selection-explainer">
       <% if historical_status? %>
         <p class="lede">
-          Historical status selects articles that matched at a <strong>recorded
-          pre-event state inside this window</strong>, even if their current status
-          is different or they have since been deleted. The resulting activity
-          covers their whole selected window, including changes in other statuses.
+          Historical status selects articles that matched in <strong>any state
+          inside this window</strong>: as each was when the window started, and
+          after each change inside it, including the latest. That holds even if
+          their current status is different or they have since been deleted. The
+          resulting activity covers their whole selected window, including changes
+          in other statuses.
         </p>
         <p class="lede">
-          A status introduced by the final event is not eligible until a later
-          in-window version records it. <code>close_on: :current</code> completes
-          the diff; it does not make the current state eligible for this filter.
-          A newly created article with only its create version has no prior state
-          to test. This is a query of recorded states, not every instant of time.
+          It tests those states, not every instant of time, and an article created
+          inside the window has no state before its creation to test.
         </p>
         <% if @status != ReportsController::ALL_STATUSES %>
           <p class="lede">
@@ -93,8 +92,7 @@
       Ending at <strong>now</strong> is the interesting part. A PaperTrail
       version stores the state that existed <em>before</em> its own event, so
       the last change inside the window has no later version to reveal it.
-      <code>report</code> selects <code>close_on: :current</code> to close the window on the live record
-      instead.
+      <code>report</code> closes the window on the live record instead.
     </p>
 
     <p class="lede">
@@ -104,21 +102,6 @@
       event; one transaction can contain changes by multiple people.
     </p>
 
-    <p class="lede">
-      <%= link_to "Demonstrate a missing closing boundary", report_path(closure_example_params) %>
-      reruns selection once without <code>close_on:</code> to show the error it prevents.
-    </p>
-    <% if params[:explain_closure] == "1" && !@incomplete_error && !@report_error %>
-      <p class="lede">This selection already has sufficient closing boundaries.</p>
-    <% end %>
-
-    <% if @incomplete_error %>
-      <div class="report-note">
-        <p class="eyebrow">Without <code>close_on: :current</code></p>
-        <p>The same window raises rather than under-reporting:</p>
-        <pre><code><%= @incomplete_error %></code></pre>
-      </div>
-    <% end %>
   </section>
 
   <section class="panel report-scenarios">

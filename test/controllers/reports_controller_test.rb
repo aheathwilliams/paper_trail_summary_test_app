@@ -26,16 +26,6 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "Last 24 hours"
   end
 
-  # The whole reason the report passes `close_on: :current`. A window ending at
-  # the present has no version after its final change, so without it the call
-  # raises rather than under-reporting -- and the page shows that on purpose.
-  test "shows what close_on: :current protects against when explicitly requested" do
-    get_report(explain_closure: "1")
-
-    assert_response :success
-    assert_select "pre code", { text: /IncompleteTimeRangeError|later root version/ }, response.body
-  end
-
   # Where `analyze_many` returns an empty Analysis for every record handed to
   # it, `analyze_scope` selects only the roots whose history moved inside the
   # window -- so one with no versions there is absent rather than empty, and the
@@ -191,7 +181,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "p", text: /Nonmatching histories are excluded/
   end
 
-  test "historical selection does not silently include the final live state" do
+  test "historical selection includes the state the latest change left" do
     final = Article.create!(title: "Final review", status: "draft", body: "Body")
     final.update!(status: "review")
     born = Article.create!(title: "Born in review", status: "review", body: "Body")
@@ -201,9 +191,9 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".report-card h3", text: born.title
 
     get_report(status: "review", status_basis: "historical")
-    assert_select ".report-card h3", text: final.title, count: 0
-    assert_select ".report-card h3", text: born.title, count: 0
-    assert_select ".selection-explainer", text: /does not make the current state eligible/
+    assert_select ".report-card h3", text: final.title
+    assert_select ".report-card h3", text: born.title
+    assert_select ".selection-explainer", text: /including the latest/
   end
 
   test "only historical states recorded inside the chosen window are eligible" do
@@ -247,7 +237,7 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     get_report(status_basis: "historical", status: "review", group: "events")
     assert_select ".report-card h3", text: "History example: moved out of Review"
     assert_select ".deleted-history h3", text: /History example: deleted in Review/
-    assert_select ".report-card h3", text: "History example: final event entered Review", count: 0
+    assert_select ".report-card h3", text: "History example: final event entered Review"
 
     get_report(status_basis: "current", status: "review")
     assert_select ".report-card h3", text: "History example: final event entered Review"
@@ -266,8 +256,6 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
 
     assert_response :success
     assert_equal 1, selections.length
-    assert_select "a[href*='explain_closure=1'][href*='status_basis=historical']"
-    assert_select "a[href*='explain_closure=1'][href*='status=review']"
   end
 
   test "deleted histories do not add queries per article" do
