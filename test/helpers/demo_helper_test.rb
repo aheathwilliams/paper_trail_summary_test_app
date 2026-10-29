@@ -7,6 +7,16 @@ class DemoHelperTest < ActionView::TestCase
     DemoSource::Snippet.new(key: "x.y", layer: "y", path: "p", language:, code:)
   end
 
+  test "renders a sentence's values as code and escapes both kinds of text" do
+    sentence = NarrativeTimeline::Sentence.new(segments: [
+      NarrativeTimeline::Segment.new(text: "`Ann` <b>renamed</b> it to ", code: false),
+      NarrativeTimeline::Segment.new(text: "Run `rake` <i>first</i>", code: true)
+    ])
+
+    assert_equal "`Ann` &lt;b&gt;renamed&lt;/b&gt; it to <code>Run `rake` &lt;i&gt;first&lt;/i&gt;</code>",
+                 narrative_sentence(sentence)
+  end
+
   test "marks gem calls and leaves ordinary code alone" do
     html = demo_source_html(snippet("analysis = PaperTrailDiff.analyze(record)\nlocal = record.title"))
 
