@@ -19,14 +19,11 @@ class DeletedArticleHistory
 
   private
 
-  # The window closes on the deletion, so the article's last state is the one
-  # the final step started from. An article created inside the window has no
-  # state at its start either, so the analysis's own endpoints can both be nil.
+  # The final step removes the article, so it holds the article just before
+  # deletion. The analysis's own endpoints can both be nil: an article created
+  # inside the window did not exist when it began either.
   def last_state(analysis)
-    return unless analysis
-
-    analysis.activity_timeline.reverse_each.find(&:from_snapshot)&.from_snapshot ||
-      analysis.from_snapshot
+    analysis&.activity_timeline&.last&.diff&.record_presence_change&.from
   end
   # demo:code end
 end
