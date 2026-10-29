@@ -44,8 +44,8 @@ class DemoController < ApplicationController
     @selected_to_value = current_endpoint? ? CURRENT_ENDPOINT : @to_endpoint.id
     @association_options = association_options
     @selected_associations = selected_associations
-    @author_options = author_options
-    @selected_author = selected_author_filter
+    @author_options = root_authors
+    @selected_author = params[:whodunnit].presence
     @group = selected_grouping
     @ignored_attributes = configured_ignored_attributes
     @ignored_paths = configured_ignored_paths
@@ -99,27 +99,23 @@ class DemoController < ApplicationController
     end
 
     # demo:code shared.controller
-    # One pass over the history produces every view on this page. `scoped_options`
-    # carries what the form chose: `associations:`, `ignore:`, and `version_scope:`
-    # when a person is selected.
+    # One pass over the history produces every view on this page.
+    # `comparison_options` carries what the form chose: `associations:` and
+    # `ignore:`.
     analysis = PaperTrailDiff.analyze(
       @article,
       from: @from_version,
       to: @to_endpoint,
-      **scoped_options,
+      **comparison_options,
       activity: true,   # also build the descendant-aware timeline
       snapshots: true,  # keep each step's reconstructed state for the narrative
       group: @group     # nil, or :transaction to report one save as one step
     )
-    @diff = analysis.diff       # endpoint and overview tabs
-    @steps = analysis.timeline  # checkpoints tab
+    @diff = analysis.diff                 # endpoint and overview tabs
+    @steps = checkpoint_steps(analysis)   # checkpoints tab
     # demo:code end
     assign_activity_steps(analysis.activity_timeline)
-    @activity_api_label = if @selected_author
-      "PaperTrailDiff.analyze(..., activity: true, version_scope: ...)"
-    else
-      "PaperTrailDiff.analyze(..., activity: true)"
-    end
+    @activity_api_label = "PaperTrailDiff.analyze(..., activity: true)"
     @diagnostics = PaperTrailDiff.diagnose(
       @from_version,
       @to_endpoint,
@@ -131,22 +127,20 @@ class DemoController < ApplicationController
     latest_version = @selectable_versions.last
     begin
       analysis = PaperTrailDiff.analyze(
-        @article, from: @from_version, to: @article, **scoped_options,
+        @article, from: @from_version, to: @article, **comparison_options,
         activity: true, snapshots: true, group: @group
       )
       @diff = analysis.diff
-      @steps = analysis.timeline
+      @steps = checkpoint_steps(analysis)
       assign_activity_steps(analysis.activity_timeline)
       @activity_api_label = "PaperTrailDiff.analyze(..., to: article, activity: true)"
     rescue PaperTrailDiff::UnsupportedLiveActivityError
       # HABTM activity needs a historical closing boundary. The endpoint and
       # checkpoint views can still include the current record explicitly.
       @diff = PaperTrailDiff.compare(@from_version, @article, **comparison_options)
-      @steps = PaperTrailDiff.timeline(
-        @article, from: @from_version, to: @article, **scoped_options
-      )
+      @steps = checkpoint_steps
       assign_activity_steps(PaperTrailDiff.activity_timeline(
-        @article, from: @from_version, to: latest_version, **scoped_options,
+        @article, from: @from_version, to: latest_version, **comparison_options,
         snapshots: true, group: @group
       ))
       @activity_api_label = "PaperTrailDiff.activity_timeline(..., to: latest_version)"
@@ -165,10 +159,20 @@ class DemoController < ApplicationController
     @activity_steps = steps
     # demo:code visible.controller
     # A step whose diff is empty is a boundary nothing you selected crossed --
-    # a checkpoint, or a change to a field you ignored. Every step type answers
-    # `empty?`, so one filter serves both timelines.
-    @visible_activity_steps = steps.reject(&:empty?)
+    # a checkpoint, or a change to a field you ignored.
+    attributed = steps.reject(&:empty?)
+    # "Changes by" asks who made each event, so it filters the steps rather
+    # than the root versions: someone who only edited comments has no root
+    # versions at all. Every step is still built, because each one's diff is
+    # only right when its neighbors are there. A grouped step is credited to
+    # the first event in its transaction.
+    @visible_activity_steps = if @selected_author
+      attributed.select { |step| step.source_boundary.whodunnit == @selected_author }
+    else
+      attributed
+    end
     # demo:code end
+    add_author_options(attributed)
     # demo:code narratives.controller
     # The narrative reads reconstructed state from each step, which is why the
     # steps above are built with `snapshots: true`.
@@ -180,25 +184,36 @@ class DemoController < ApplicationController
     { associations: @selected_associations, ignore: @ignore_option }
   end
 
-  # `compare` diffs two endpoints you named yourself, so a filter cannot change
-  # its answer and it does not accept one. Only the range-selecting calls take
-  # the hook.
-  def scoped_options
-    return comparison_options unless @selected_author
+  # demo:code checkpoints.controller
+  # The checkpoint timeline steps between root versions, so choosing one
+  # person's is the question `version_scope:` answers. The hook receives the
+  # version relation the range selected and returns a narrowed one, so the
+  # filtering happens in SQL rather than over reified snapshots.
+  def checkpoint_steps(analysis = nil)
+    return analysis.timeline if analysis && !@selected_author
 
-    comparison_options.merge(version_scope: author_version_scope)
+    PaperTrailDiff.timeline(
+      @article, from: @from_version, to: @to_endpoint, **comparison_options, **person_scope
+    )
   end
 
-  # The "changes made by one person" report. The hook receives the version
-  # relation the range selected and returns a narrowed one, so the filtering
-  # happens in SQL rather than over reified snapshots.
-  def author_version_scope
+  def person_scope
+    return {} unless @selected_author
+
     author = @selected_author
-    ->(scope) { scope.where(whodunnit: author) }
+    { version_scope: ->(scope) { scope.where(whodunnit: author) } }
+  end
+  # demo:code end
+
+  def root_authors
+    @versions.filter_map(&:whodunnit).uniq.sort
   end
 
-  def author_options
-    @versions.filter_map(&:whodunnit).uniq.sort
+  # People who changed only comments, authors, or tags appear in the activity
+  # steps but in none of the root versions, and the filter must offer them too.
+  def add_author_options(steps)
+    actors = steps.filter_map { |step| step.source_boundary.whodunnit.presence }
+    @author_options = [ *@author_options, *actors, *@selected_author ].uniq.sort
   end
 
   # demo:code activity.controller
@@ -211,13 +226,6 @@ class DemoController < ApplicationController
     params[:group] == "transaction" ? :transaction : nil
   end
   # demo:code end
-
-  def selected_author_filter
-    requested = params[:whodunnit]
-    return if requested.blank?
-
-    @author_options.include?(requested) ? requested : nil
-  end
 
   def current_endpoint?
     @to_endpoint.equal?(@article)
