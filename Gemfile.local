@@ -1,10 +1,9 @@
 # Opt-in bundle for exercising the working copy of the gem instead of the
-# exact Git revision that Gemfile pins:
+# release that Gemfile uses:
 #
 #   BUNDLE_GEMFILE=Gemfile.local bin/rails test
 #   BUNDLE_GEMFILE=Gemfile.local bin/rails runner script.rb
 #
-# Gemfile itself pins the reviewed gem revision for reproducible integration.
 # This file is a copy of it with only the paper_trail_diff source changed.
 
 source "https://rubygems.org"
