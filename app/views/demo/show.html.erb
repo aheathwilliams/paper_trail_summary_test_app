@@ -545,9 +545,9 @@
             options_for_select(@author_options, @selected_author),
             { include_blank: "Everyone" } %>
           <small>
-            Passed to <code>version_scope:</code>. Picking a person reports only
-            their edits, each one bounded by the version that immediately
-            followed it, so its diff is exactly what they changed.
+            Picking a person keeps the events they made, including edits to
+            comments, authors, and tags. Checkpoints pass it to
+            <code>version_scope:</code>, which sees only the article's own versions.
           </small>
         </label>
         <label class="author-filter">
@@ -1012,9 +1012,14 @@
         <div class="section-heading timeline-heading">
           <div>
             <p class="eyebrow">Presentation timeline</p>
-            <h2><%= pluralize(@visible_activity_steps.length, "visible event") %></h2>
+            <h2>
+              <%= pluralize(@visible_activity_steps.length, "visible event") %>
+              <% if @selected_author %>
+                <span class="filter-note">by <%= @selected_author %></span>
+              <% end %>
+            </h2>
           </div>
-          <code>analysis.activity_timeline.reject(&amp;:empty?)</code>
+          <code>analysis.activity_timeline.reject(&amp;:empty?)<%= ".select { source_boundary.whodunnit }" if @selected_author %></code>
         </div>
 
         <p class="visible-events-intro">
@@ -1056,7 +1061,9 @@
           <% end %>
           <%# demo:code end %>
           <% if @visible_activity_steps.empty? %>
-            <div class="panel empty-step">No visible changes remain after ignores.</div>
+            <div class="panel empty-step">
+              <%= @selected_author ? "#{@selected_author} made no visible changes in this range." : "No visible changes remain after ignores." %>
+            </div>
           <% end %>
         </div>
 
@@ -1069,7 +1076,12 @@
         <div class="section-heading timeline-heading">
           <div>
             <p class="eyebrow">Humanized activity</p>
-            <h2><%= pluralize(@narrative_events.length, "narrative event") %></h2>
+            <h2>
+              <%= pluralize(@narrative_events.length, "narrative event") %>
+              <% if @selected_author %>
+                <span class="filter-note">by <%= @selected_author %></span>
+              <% end %>
+            </h2>
           </div>
           <code>step.diff.each_change</code>
         </div>
