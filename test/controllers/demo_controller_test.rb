@@ -268,15 +268,20 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     # Maya Chen renames the article, and someone else edits it afterwards. The
     # transition reported for Maya must end at the version immediately after
     # her edit, not at the next edit of her own, or it would show her making
-    # the other person's change too.
+    # the other person's change too. Her latest edit has no later version, so
+    # it ends at the current record.
     scope = ->(relation) { relation.where(whodunnit: "Maya Chen") }
-    steps = PaperTrailDiff.timeline(@article, from: :first, to: :last, version_scope: scope)
+    steps = PaperTrailDiff.timeline(@article, version_scope: scope)
 
     assert_predicate steps, :any?
     steps.each do |step|
       assert_equal "Maya Chen", step.from_version.whodunnit
       following = @article.versions.where("id > ?", step.from_version.id).order(:id).first
-      assert_equal following.id, step.to_version.id
+      if following
+        assert_equal following.id, step.to_version.id
+      else
+        assert_equal :current, step.to_boundary.kind
+      end
     end
   end
 

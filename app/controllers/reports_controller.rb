@@ -1,4 +1,4 @@
-# "What changed across every article recently?" -- the question `analyze_many`
+# "What changed across every article recently?" -- the question `report`
 # and a wall-clock window exist for, and the one the single-article studio on
 # the root page cannot answer.
 class ReportsController < ApplicationController
@@ -19,8 +19,10 @@ class ReportsController < ApplicationController
   def show
     @window_key = WINDOWS.key?(params[:window]) ? params[:window] : DEFAULT_WINDOW
     @window_label = WINDOWS.fetch(@window_key).fetch(:label)
-    @status = params[:status].presence || ALL_STATUSES
-    @statuses = Article.distinct.order(:status).pluck(:status).compact
+    @status = Article::STATUSES.include?(params[:status]) ? params[:status] : ALL_STATUSES
+    @status_basis = params[:status_basis] == "historical" ? "historical" : "current"
+    # Historical values may have disappeared from the live table entirely.
+    @statuses = Article::STATUSES
     @scope = article_scope.order(:title, :id)
     @window = window_range
     @group = params[:group] == "events" ? nil : :transaction
@@ -30,9 +32,8 @@ class ReportsController < ApplicationController
     @unreachable = report.unreachable
     @articles = report.roots
     @deleted_histories = DeletedArticleHistory.new(
-      @unreachable.first(DELETED_LIMIT), within: @window, group: @group
+      report.deleted.first(DELETED_LIMIT).to_h
     ).call
-    @incomplete_error = incomplete_window_error
   rescue PaperTrailDiff::Error => error
     @report_error = "#{error.class}: #{error.message}"
   end
@@ -47,49 +48,41 @@ class ReportsController < ApplicationController
   end
 
   def article_scope
-    return Article.all if @status == ALL_STATUSES
+    return Article.all if @status == ALL_STATUSES || historical_status?
 
     Article.where(status: @status)
   end
 
-  # demo:code report.controller
-  # `analyze_scope` takes the relation rather than a list this controller
-  # assembled. It finds the roots whose history moved inside the window, loads
-  # them, and analyzes them -- the selection this
-  # gem already performs, which a caller would otherwise reimplement.
-  #
-  # `close_on: :current` is what makes a window ending *now* answerable. A
-  # PaperTrail version stores the state before its own event, so the final
-  # change inside the window has no later version to reveal it; without this
-  # the call raises IncompleteTimeRangeError rather than under-reporting.
-  #
-  # `unreachable` names roots that changed in the window but have no live row
-  # left. A relation's conditions are evaluated against the live table, so a
-  # destroyed root cannot be tested against them at all -- reporting them keeps
-  # a deletions audit from quietly coming up short.
-  def build_report
-    PaperTrailDiff.analyze_scope(
-      @scope,
-      within: @window,
-      associations: ASSOCIATIONS,
-      limit: LIMIT,
-      close_on: :current,
-      activity: true,
-      group: @group,
-      snapshots: true
-    )
+  def historical_status?
+    @status_basis == "historical"
+  end
+  helper_method :historical_status?
+
+  # demo:code report.filter
+  def historical_filter
+    return unless historical_status? && @status != ALL_STATUSES
+
+    { status: @status }
   end
   # demo:code end
 
-  # Runs the same window without `close_on:` purely to show what it protects
-  # against. A real report would not do this; the demo does, because the error
-  # is the single most common surprise when reporting on the present.
-  def incomplete_window_error
-    PaperTrailDiff.analyze_scope(@scope, within: @window, associations: ASSOCIATIONS, limit: LIMIT)
-    nil
-  rescue PaperTrailDiff::IncompleteTimeRangeError => error
-    error.message
+  # demo:code report.controller
+  # `report` returns recent activity through now, closing on the live record.
+  # Deleted histories are loaded as a separate batch because current SQL filters
+  # cannot establish whether a deleted row matched the live population.
+  def build_report
+    PaperTrailDiff.report(
+      @scope,
+      since: @window.begin,
+      associations: ASSOCIATIONS,
+      limit: LIMIT,
+      include_deleted: true,
+      group: @group,
+      snapshots: true,
+      historical_filter: historical_filter
+    )
   end
+  # demo:code end
 
   helper_method :changed_articles, :quiet_articles, :reported_articles
 
