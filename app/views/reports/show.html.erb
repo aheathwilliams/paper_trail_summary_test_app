@@ -6,9 +6,9 @@
       <p class="eyebrow">Batch reporting</p>
       <h1>Recent <span>activity report</span></h1>
       <p class="lede">
-        See recent changes across articles with recorded article events in the
-        selected window, including their selected child activity. Editing only a
-        child does not select an otherwise quiet article.
+        See recent changes across articles whose history, or whose selected
+        children's history, moved in the selected window, including that child
+        activity. Editing only a comment selects its article.
       </p>
     </div>
     <%= link_to "Back to the studio", root_path, class: "button button-secondary" %>
@@ -70,9 +70,9 @@
         </p>
         <% if @status != ReportsController::ALL_STATUSES %>
           <p class="lede">
-            The <%= ReportsController::LIMIT %>-root safety ceiling counts historical
-            matches, including deleted roots, before live selection. Historical filtering
-            also stops if it would load more than 10,000 candidate versions.
+            The <%= ReportsController::LIMIT %>-root safety ceiling counts the articles
+            that match, including deleted ones. Historical filtering also stops if it
+            would load more than 10,000 candidate versions.
           </p>
         <% else %>
           <p class="lede">Any status applies no historical predicate and includes all candidates.</p>
@@ -98,8 +98,8 @@
     <p class="lede">
       Activity includes comments and replies, authorships and authors, and document
       metadata. Tag membership is available in the studio's endpoint comparison;
-      live HABTM activity is unsupported. Grouped activity credits the first source
-      event; one transaction can contain changes by multiple people.
+      live HABTM activity is unsupported. A grouped step lists every event in its
+      transaction, so each change is credited to whoever made it.
     </p>
 
   </section>

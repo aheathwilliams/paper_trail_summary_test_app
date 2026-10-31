@@ -114,6 +114,28 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Restorer/, card.text)
   end
 
+  # An article is selected when it, or a record on a requested association,
+  # has a version in the window, so a comment edit alone brings in its article.
+  test "selects an otherwise quiet article whose comment changed" do
+    quiet = travel_to 2.days.ago do
+      VersionClock.reset!
+      Article.create!(title: "Quiet article", status: "draft", body: "Body").tap do |article|
+        article.comments.create!(author: "Commenter", body: "Before the window")
+      end
+    end
+    VersionClock.reset!
+    PaperTrail.request(whodunnit: "Comment editor") do
+      quiet.comments.first.update!(body: "Edited inside the window")
+    end
+
+    get_report(window: "24h")
+
+    assert_response :success
+    card = css_select(".report-card").find { |node| node.at_css("h3")&.text == "Quiet article" }
+    assert card, "expected the comment edit to select its article"
+    assert_match(/Edited inside the window/, card.text)
+  end
+
   test "shows deleted history even when no live articles remain" do
     title = @article.title
     Article.destroy_all

@@ -1,6 +1,14 @@
 class DemoHistory
   class << self
+    # Seeds through VersionClock, so a host clock that steps backwards cannot
+    # reorder the history it writes.
     def create!
+      VersionClock.monotonic { seed! }
+    end
+
+    private
+
+    def seed!
       clear!
 
       article = as("Maya Chen") do
@@ -227,8 +235,6 @@ class DemoHistory
 
       article.reload
     end
-
-    private
 
     def as(person, &block)
       PaperTrail.request(whodunnit: person, &block)
