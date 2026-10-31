@@ -114,6 +114,28 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_match(/Restorer/, card.text)
   end
 
+  # An article is selected when it, or a record on a requested association,
+  # has a version in the window, so a comment edit alone brings in its article.
+  test "selects an otherwise quiet article whose comment changed" do
+    quiet = travel_to 2.days.ago do
+      VersionClock.reset!
+      Article.create!(title: "Quiet article", status: "draft", body: "Body").tap do |article|
+        article.comments.create!(author: "Commenter", body: "Before the window")
+      end
+    end
+    VersionClock.reset!
+    PaperTrail.request(whodunnit: "Comment editor") do
+      quiet.comments.first.update!(body: "Edited inside the window")
+    end
+
+    get_report(window: "24h")
+
+    assert_response :success
+    card = css_select(".report-card").find { |node| node.at_css("h3")&.text == "Quiet article" }
+    assert card, "expected the comment edit to select its article"
+    assert_match(/Edited inside the window/, card.text)
+  end
+
   test "shows deleted history even when no live articles remain" do
     title = @article.title
     Article.destroy_all
@@ -126,14 +148,20 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".deleted-history .narrative-sentence", text: /removed|deleted/i
   end
 
-  test "keeps deleted history separate from the current status filter" do
+  test "lists a deleted article under the status it had when it was deleted" do
+    assert_equal "approved", @article.status
     @article.destroy!
+
+    get_report(status: "approved")
+
+    assert_response :success
+    assert_select ".deleted-history h3", text: /Apollo Notes/
+    assert_select "p", text: /were\s+Approved\s+when they were deleted/
 
     get_report(status: "draft")
 
     assert_response :success
-    assert_select ".deleted-history h3", text: /Apollo Notes/
-    assert_select "p", text: /regardless of the current status filter/
+    assert_select ".deleted-history", count: 0
   end
 
   test "states when a missing root has no destroy version" do

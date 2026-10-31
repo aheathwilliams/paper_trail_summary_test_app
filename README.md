@@ -53,6 +53,14 @@ HABTM tag membership and target-attribute changes. Article version timestamps
 are recorded at the actual checkpoint time so PT-AT can reconstruct tags
 created shortly before a manual boundary.
 
+PT-AT records tag membership only when an article saves a version, from the
+instance that saves it, and never forgets the tag changes that instance made,
+not even on `reload`. So the seed loads the article again after changing its
+tags. Every tag change, in the seed and through the UI, is saved between two
+checkpoints by the person making it. The gem credits a membership change to
+the step after the earlier of the two article versions around it, and the
+first checkpoint makes that step the actor's.
+
 Article create versions are also selectable. Comparing one to the initial
 checkpoint demonstrates the structured absent-to-present
 `record_presence_change`.
@@ -114,14 +122,16 @@ A deleted article's title comes from the last state its timeline saw, since an
 article created and deleted inside the window has no state at either end.
 The report uses `ScopedAnalysis#roots` to reuse the loaded articles in relation
 order instead of querying them a second time.
-A transaction's source boundary describes its first event, not every actor in it.
+A transaction's source boundary describes its first event, and `step.sources`
+lists every event in it, so the narrative credits each change to its own author.
 Edits that cancel each other remain visible even when the net diff is empty.
 
 The requested graph is explicit: comments and replies, authorships and authors,
 and document metadata. HABTM tags remain available in the studio's endpoint
 comparison because live HABTM activity is unsupported.
-Selection requires an article version in the window: changing only a child of
-an otherwise quiet article does not bring that article into the report.
+An article is selected when it, or a record on one of those associations, has a
+version in the window, so editing only a comment brings its article into the
+report with the edit.
 
 Choose **Current state** to filter today's rows, or **Recorded historical states**
 to pass `{ status: selected_status }` through `historical_filter:`. This reads
@@ -144,14 +154,16 @@ out-of-window cases. Selecting a root includes its whole activity window, rather
 than just events while it held the chosen status. Any status skips the predicate.
 
 Deleted roots appear separately from the current-status population, even when
-no live articles remain. With a historical status predicate, only deleted roots
-with a recorded matching state in the window are included. `report.deleted`
+no live articles remain. With a current status filter, only deleted roots that
+held that status when they were deleted are included: the gem tests the
+relation's conditions against the state their destroy version recorded. With a
+historical status predicate, only deleted roots with a recorded matching state
+in the window are included. `report.deleted`
 provides their analyses in one batch, including the same selected associations
 as the live report. Rows without destroy history are marked unavailable. The
 presenter performs no queries or reification and displays the first 25 missing
-roots, with a notice when more remain. It never assumes a deleted article matched
-the live status filter. The 500-root ceiling covers live and missing roots
-together; historical selection also limits all matches before live filtering.
+roots, with a notice when more remain. The 500-root ceiling covers the live and
+missing roots the report selects together, after historical filtering.
 Historical filtering has a separate default budget of 10,000 loaded versions.
 These ceilings do not bound arbitrary history reconstruction work; narrow large
 windows rather than treating the limits as pagination.
@@ -222,3 +234,15 @@ default 31-version dataset shows almost no difference.
 bundle exec rails test
 bundle exec rails runner 'puts PaperTrailDiff::VERSION'
 ```
+
+`test/oracle/history_oracle_test.rb` makes random edits through the app's
+models, records the article's graph after each transaction with plain Active
+Record, and checks every rebuilt state the gem reports against those records.
+It runs two seeds by default. Widen it before a release:
+
+```console
+ORACLE_SEEDS=1..50 ORACLE_STEPS=80 bin/rails test test/oracle
+```
+
+CI runs the suite against the released gem and against the gem's `main`
+branch, so a change in the gem is checked here before it is published.

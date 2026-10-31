@@ -98,6 +98,11 @@ class DemoController < ApplicationController
       return
     end
 
+    # Checked first, so a request the gem refuses still shows why.
+    @diagnostics = PaperTrailDiff.diagnose(
+      @from_version, @to_endpoint, associations: @selected_associations
+    )
+
     # demo:code shared.controller
     # One pass over the history produces every view on this page.
     # `comparison_options` carries what the form chose: `associations:` and
@@ -116,15 +121,14 @@ class DemoController < ApplicationController
     # demo:code end
     assign_activity_steps(analysis.activity_timeline)
     @activity_api_label = "PaperTrailDiff.analyze(..., activity: true)"
-    @diagnostics = PaperTrailDiff.diagnose(
-      @from_version,
-      @to_endpoint,
-      associations: @selected_associations
-    )
   end
 
   def build_current_comparison
     latest_version = @selectable_versions.last
+    # diagnose takes the current record as an endpoint, as compare does.
+    @diagnostics = PaperTrailDiff.diagnose(
+      @from_version, @article, associations: @selected_associations
+    )
     begin
       analysis = PaperTrailDiff.analyze(
         @article, from: @from_version, to: @article, **comparison_options,
@@ -150,9 +154,6 @@ class DemoController < ApplicationController
         current database state; checkpoints also include the current boundary.
       MESSAGE
     end
-    @diagnostics = PaperTrailDiff.diagnose(
-      @from_version, latest_version, associations: @selected_associations
-    )
   end
 
   def assign_activity_steps(steps)
@@ -164,10 +165,11 @@ class DemoController < ApplicationController
     # "Changes by" asks who made each event, so it filters the steps rather
     # than the root versions: someone who only edited comments has no root
     # versions at all. Every step is still built, because each one's diff is
-    # only right when its neighbors are there. A grouped step is credited to
-    # the first event in its transaction.
+    # only right when its neighbors are there. A grouped step lists every
+    # event in its transaction as `step.sources`, so it is kept when the
+    # person made any of them.
     @visible_activity_steps = if @selected_author
-      attributed.select { |step| step.source_boundary.whodunnit == @selected_author }
+      attributed.select { |step| step.sources.any? { |source| source.whodunnit == @selected_author } }
     else
       attributed
     end
@@ -212,7 +214,7 @@ class DemoController < ApplicationController
   # People who changed only comments, authors, or tags appear in the activity
   # steps but in none of the root versions, and the filter must offer them too.
   def add_author_options(steps)
-    actors = steps.filter_map { |step| step.source_boundary.whodunnit.presence }
+    actors = steps.flat_map(&:sources).filter_map { |source| source.whodunnit.presence }
     @author_options = [ *@author_options, *actors, *@selected_author ].uniq.sort
   end
 
