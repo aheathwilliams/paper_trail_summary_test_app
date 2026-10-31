@@ -234,3 +234,15 @@ default 31-version dataset shows almost no difference.
 bundle exec rails test
 bundle exec rails runner 'puts PaperTrailDiff::VERSION'
 ```
+
+`test/oracle/history_oracle_test.rb` makes random edits through the app's
+models, records the article's graph after each transaction with plain Active
+Record, and checks every rebuilt state the gem reports against those records.
+It runs two seeds by default. Widen it before a release:
+
+```console
+ORACLE_SEEDS=1..50 ORACLE_STEPS=80 bin/rails test test/oracle
+```
+
+CI runs the suite against the released gem and against the gem's `main`
+branch, so a change in the gem is checked here before it is published.
