@@ -126,14 +126,20 @@ class ReportsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".deleted-history .narrative-sentence", text: /removed|deleted/i
   end
 
-  test "keeps deleted history separate from the current status filter" do
+  test "lists a deleted article under the status it had when it was deleted" do
+    assert_equal "approved", @article.status
     @article.destroy!
+
+    get_report(status: "approved")
+
+    assert_response :success
+    assert_select ".deleted-history h3", text: /Apollo Notes/
+    assert_select "p", text: /were\s+Approved\s+when they were deleted/
 
     get_report(status: "draft")
 
     assert_response :success
-    assert_select ".deleted-history h3", text: /Apollo Notes/
-    assert_select "p", text: /regardless of the current status filter/
+    assert_select ".deleted-history", count: 0
   end
 
   test "states when a missing root has no destroy version" do

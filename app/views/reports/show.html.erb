@@ -120,15 +120,18 @@
       <p class="eyebrow">Reached by history, not by the relation</p>
       <p>
         These roots changed inside the window but have no live row left. A
-        relation's conditions are evaluated against the live table, so a
-        destroyed root cannot be tested against the live status filter. Historical
-        mode can test its recorded states before it is listed here.
+        relation's conditions cannot run against a row that is gone, so the gem
+        tests them against the state recorded when the root was deleted.
+        Historical mode tests its recorded states in the window instead.
       </p>
       <% if historical_status? && @status != ReportsController::ALL_STATUSES %>
         <p>These deleted articles matched <strong><%= @status.humanize %></strong>
           at a recorded pre-event state in this window. Nonmatching histories are excluded.</p>
+      <% elsif @status != ReportsController::ALL_STATUSES %>
+        <p>These deleted articles were <strong><%= @status.humanize %></strong>
+          when they were deleted. Articles deleted with another status are excluded.</p>
       <% else %>
-        <p>Deleted history is shown separately, regardless of the current status filter.</p>
+        <p>Deleted history is shown separately, for every status.</p>
       <% end %>
       <p>Deleted activity includes the same explicitly requested associations as live activity.</p>
       <% @deleted_histories.each do |entry| %>

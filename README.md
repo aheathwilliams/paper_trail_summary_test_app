@@ -144,13 +144,15 @@ out-of-window cases. Selecting a root includes its whole activity window, rather
 than just events while it held the chosen status. Any status skips the predicate.
 
 Deleted roots appear separately from the current-status population, even when
-no live articles remain. With a historical status predicate, only deleted roots
-with a recorded matching state in the window are included. `report.deleted`
+no live articles remain. With a current status filter, only deleted roots that
+held that status when they were deleted are included: the gem tests the
+relation's conditions against the state their destroy version recorded. With a
+historical status predicate, only deleted roots with a recorded matching state
+in the window are included. `report.deleted`
 provides their analyses in one batch, including the same selected associations
 as the live report. Rows without destroy history are marked unavailable. The
 presenter performs no queries or reification and displays the first 25 missing
-roots, with a notice when more remain. It never assumes a deleted article matched
-the live status filter. The 500-root ceiling covers live and missing roots
+roots, with a notice when more remain. The 500-root ceiling covers live and missing roots
 together; historical selection also limits all matches before live filtering.
 Historical filtering has a separate default budget of 10,000 loaded versions.
 These ceilings do not bound arbitrary history reconstruction work; narrow large
