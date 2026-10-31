@@ -73,18 +73,43 @@ class NarrativeTimeline
   end
 
   def item_for(entry, step, credits)
+    actor = actor_for(entry, step)
     case entry.kind
     when :attribute_changed
-      attribute_item(entry, step)
+      attribute_item(entry, step, actor)
     when :record_added
-      membership_item(entry, step, :added, credits)
+      membership_item(entry, step, :added, credits, actor)
     when :record_removed
-      membership_item(entry, step, :removed, credits)
+      membership_item(entry, step, :removed, credits, actor)
     when :record_presence_changed
-      presence_item(entry, step.source_boundary)
+      presence_item(entry, actor)
     when :relationship_added, :relationship_removed, :relationship_replaced
-      relationship_item(entry, step.source_boundary)
+      relationship_item(entry, actor)
     end
+  end
+
+  # A step grouped by transaction can hold several people's changes, and
+  # `step.sources` lists each event with its author. An item is credited to
+  # the event that changed its record. A tag's membership has no event of its
+  # own, so it keeps the step's source.
+  def actor_for(entry, step)
+    record = credited_record(entry, step)
+    source = record && step.sources.find { |candidate| same_record?(candidate.record, record) }
+    actor_name(source || step.source_boundary)
+  end
+
+  def credited_record(entry, step)
+    return entry.value if MEMBERSHIP_KINDS.include?(entry.kind)
+
+    entry.record || root_snapshot(step)
+  end
+
+  def root_snapshot(step)
+    step.to_snapshot || step.from_snapshot
+  end
+
+  def same_record?(reference, record)
+    reference.type == record.type && reference.id.to_s == record.id.to_s
   end
 
   # Adding an author adds the author and the join row that credits them, so
@@ -106,11 +131,11 @@ class NarrativeTimeline
     Credits.new(joins:, authors:)
   end
 
-  def attribute_item(entry, step)
-    boundary = step.source_boundary
+  # Without a record, the change is the article's own. The step's first
+  # event may be a child's, so its type does not name the record.
+  def attribute_item(entry, step, actor)
     change = entry.value
-    actor = actor_name(boundary)
-    type = entry.record&.type || boundary.item_type
+    type = entry.record&.type || root_snapshot(step)&.type || step.source_boundary.item_type
     record = record_in(step.from_snapshot, entry.association_path, entry.record_path)
 
     case type
@@ -223,10 +248,8 @@ class NarrativeTimeline
     item(:attribute_changed, sentence, change_details(attribute, change))
   end
 
-  def membership_item(entry, step, state, credits)
-    boundary = step.source_boundary
+  def membership_item(entry, step, state, credits, actor)
     snapshot = entry.value
-    actor = actor_name(boundary)
 
     case snapshot.type
     when "Comment"
@@ -338,9 +361,8 @@ class NarrativeTimeline
     item("record_#{state}".to_sym, sentence)
   end
 
-  def presence_item(entry, boundary)
+  def presence_item(entry, actor)
     change = entry.value
-    actor = actor_name(boundary)
     snapshot = change.to || change.from
     title = snapshot&.attributes&.fetch("title", nil).presence
     named = title ? [ " ", code(title) ] : []
@@ -352,8 +374,7 @@ class NarrativeTimeline
     end
   end
 
-  def relationship_item(entry, boundary)
-    actor = actor_name(boundary)
+  def relationship_item(entry, actor)
     association = entry.association.to_s.humanize.downcase
     action = entry.kind.to_s.delete_prefix("relationship_").humanize.downcase
     item(entry.kind, "#{actor} #{action} the article's #{association} relationship.")
