@@ -9,7 +9,7 @@ gem "sqlite3", ">= 2.1"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 
-gem "paper_trail_diff", "~> 0.13.1"
+gem "paper_trail_diff", "~> 0.15.0"
 
 # Optional in paper_trail_diff itself, but enabled here so the demo can show
 # nested, through, and HABTM association diffs as well as scalar diffs.

@@ -2,7 +2,7 @@
 
 A small Rails application for exercising
 [`paper_trail_diff`](https://github.com/aheathwilliams/paper_trail_diff) in a
-realistic integration. `Gemfile` uses the released gem, version 0.13.1. To try
+realistic integration. `Gemfile` uses the released gem, version 0.15.0. To try
 unreleased gem changes, use `BUNDLE_GEMFILE=Gemfile.local` with the gem working
 copy beside this app.
 
