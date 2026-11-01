@@ -321,6 +321,46 @@ class DemoControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  # A grouped step lists every event in its transaction as `step.sources`, so
+  # it belongs to everyone who made one, and each sentence names its own author
+  # rather than the transaction's first.
+  test "lists a shared save under each person in it, crediting each change" do
+    article = Article.create!(title: "Shared save", status: "draft", body: "Body")
+    comment = article.comments.create!(author: "Commenter", body: "Before")
+    Article.transaction { Article.find(article.id).paper_trail.save_with_version }
+    from = article.versions.order(:created_at, :id).last
+    PaperTrail.request(whodunnit: "Alice") do
+      Article.transaction do
+        Article.find(article.id).update!(title: "Alice's title")
+        PaperTrail.request(whodunnit: "Bob") { comment.update!(body: "Bob's body") }
+      end
+    end
+
+    get root_url, params: {
+      article_id: article.id, from_id: from.id, to_id: "current", group: "transaction",
+      associations_configured: "1", associations: %w[comments], whodunnit: "Bob"
+    }
+
+    assert_response :success
+    assert_select ".author-filter option[selected]", text: "Bob"
+    assert_select ".result-panel--visible .visible-event-step", count: 1
+    assert_select ".narrative-sentence", text: "Alice changed the article title."
+    assert_select ".narrative-sentence", text: "Bob edited the comment by Commenter."
+  end
+
+  # diagnose runs before the comparison, so a request the gem refuses still
+  # shows the check that explains it.
+  test "shows diagnostics when the gem refuses the comparison" do
+    from, to = @article.versions.where(event: "update").order(:id).first(2)
+    from.update_columns(transaction_id: nil)
+
+    get root_url, params: { article_id: @article.id, from_id: from.id, to_id: to.id }
+
+    assert_response :success
+    assert_select ".error", text: /HABTM history is incomplete/
+    assert_select ".history-diagnostics code", text: "transaction_id_missing"
+  end
+
   test "regenerates the demo history" do
     post reset_demo_url
 

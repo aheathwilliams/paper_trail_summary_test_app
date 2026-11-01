@@ -4,8 +4,7 @@ class TaggingsController < ApplicationController
   def create
     tag = Tag.find(tagging_params.fetch(:tag_id))
     record_as_actor do
-      @article.tags << tag
-      checkpoint!(@article)
+      with_habtm_checkpoints(@article) { @article.tags << tag }
     end
 
     redirect_to_article(@article, notice: "Tag attached and captured in a new article checkpoint.")
@@ -16,8 +15,7 @@ class TaggingsController < ApplicationController
   def destroy
     tag = @article.tags.find(params[:id])
     record_as_actor do
-      @article.tags.delete(tag)
-      checkpoint!(@article)
+      with_habtm_checkpoints(@article) { @article.tags.delete(tag) }
     end
 
     redirect_to_article(@article, notice: "Tag detached and captured in a new article checkpoint.")

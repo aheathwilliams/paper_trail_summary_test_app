@@ -93,6 +93,24 @@ class NarrativeTimelineTest < ActiveSupport::TestCase
     assert_equal [ "Run `rake` first" ], created.sentence.segments.select(&:code).map(&:text)
   end
 
+  # Tag membership is recorded only at article versions. The seed saves each
+  # tag change between two checkpoints by the person who made it, and always
+  # from a freshly loaded article, so the narrative credits that person and
+  # reports no tag the seed did not touch.
+  test "narrates the seed's tag changes and credits whoever made them" do
+    steps = PaperTrailDiff.activity_timeline(
+      @article, from: @from, to: @to, associations: %w[tags], snapshots: true
+    )
+    items = NarrativeTimeline.new(steps.reject(&:empty?)).call.flat_map(&:items)
+    texts = items.select { _1.kind.to_s.start_with?("tag_") }.map { _1.sentence.to_s }
+
+    assert_equal [
+      "Maya Chen changed description on the Apollo tag.",
+      "Maya Chen removed the Needs sources tag from the article.",
+      "Priya Shah added the Verified tag to the article."
+    ], texts
+  end
+
   test "produces no event without a humanized item" do
     assert_equal @steps.reject(&:empty?).length, events.length
     assert events.all? { |event| event.items.any? }

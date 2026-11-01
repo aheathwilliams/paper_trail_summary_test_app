@@ -5,10 +5,7 @@ class TagsController < ApplicationController
 
     record_as_actor do
       tag.save!
-      if article
-        article.tags << tag
-        checkpoint!(article)
-      end
+      with_habtm_checkpoints(article) { article.tags << tag } if article
     end
 
     redirect_after_tag_change(article, notice: "Tag created#{' and attached' if article}.")

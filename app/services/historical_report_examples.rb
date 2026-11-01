@@ -2,6 +2,10 @@
 # Each invocation is one transaction; destroy versions survive for the report.
 class HistoricalReportExamples
   def self.create!
+    VersionClock.monotonic { seed! }
+  end
+
+  def self.seed!
     PaperTrail.request(whodunnit: "Historical report example") do
       Article.transaction do
         moved = Article.create!(title: "History example: moved out of Review", status: "review", body: "Approved now, previously in review.")
@@ -15,4 +19,5 @@ class HistoricalReportExamples
       end
     end
   end
+  private_class_method :seed!
 end

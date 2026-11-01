@@ -25,3 +25,28 @@ jobs:
           bundler-cache: true
       - name: Run tests
         run: bin/rails test
+
+  # The released gem is checked after it is published; this checks the gem's
+  # main branch before it is. Gemfile.local reads the gem from the directory
+  # beside the app, so both repositories are checked out side by side.
+  test-gem-main:
+    name: Rails tests against the gem's main branch
+    runs-on: ubuntu-latest
+    env:
+      BUNDLE_GEMFILE: ${{ github.workspace }}/app/Gemfile.local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: app
+      - uses: actions/checkout@v4
+        with:
+          repository: aheathwilliams/paper_trail_diff
+          ref: main
+          path: paper_trail_summary
+      - uses: ruby/setup-ruby@v1
+        with:
+          working-directory: app
+          bundler-cache: true
+      - name: Run tests
+        working-directory: app
+        run: bin/rails test

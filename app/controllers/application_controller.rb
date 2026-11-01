@@ -9,10 +9,21 @@ class ApplicationController < ActionController::Base
     PaperTrail.request(whodunnit: actor.first(80)) { yield }
   end
 
+  # The gem's checkpoint recipe. A freshly loaded root records its current
+  # HABTM membership; the instance that changed the membership would record
+  # it as it was before the change, and keeps doing so on every later save.
   def checkpoint!(article)
-    # A fresh root instance snapshots current HABTM membership instead of the
-    # caller's PT-AT change buffer, which represents membership before mutation.
-    Article.find(article.id).touch
+    Article.transaction { Article.find(article.id).paper_trail.save_with_version }
+  end
+
+  # PT-AT records HABTM membership only at root versions, and the gem credits
+  # a change made between two of them to the step after the earlier one. A
+  # checkpoint just before the change, as well as after it, makes that step
+  # the actor's own.
+  def with_habtm_checkpoints(article)
+    checkpoint!(article)
+    yield
+    checkpoint!(article)
   end
 
   def redirect_to_article(article, **options)

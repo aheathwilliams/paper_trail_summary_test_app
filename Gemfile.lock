@@ -81,7 +81,7 @@ GEM
     bindex (0.8.1)
     bootsnap (1.24.6)
       msgpack (~> 1.2)
-    brakeman (8.0.5)
+    brakeman (8.1.0)
       racc
     builder (3.3.0)
     bundler-audit (0.9.3)
@@ -162,7 +162,8 @@ GEM
       request_store (~> 1.4)
     paper_trail-association_tracking (2.3.0)
       paper_trail (>= 12.0)
-    paper_trail_diff (0.13.1)
+    paper_trail_diff (0.15.0)
+      activerecord (>= 7.1, < 8.2)
       paper_trail (>= 16, < 18)
     parallel (2.1.0)
     parser (3.3.12.0)
@@ -325,7 +326,7 @@ DEPENDENCIES
   bundler-audit
   debug
   paper_trail-association_tracking (~> 2.3)
-  paper_trail_diff (~> 0.13.1)
+  paper_trail_diff (~> 0.15.0)
   propshaft
   puma (>= 5.0)
   rails (~> 8.1.3)
@@ -355,7 +356,7 @@ CHECKSUMS
   bigdecimal (4.1.2) sha256=53d217666027eab4280346fba98e7d5b66baaae1b9c3c1c0ffe89d48188a3fbd
   bindex (0.8.1) sha256=7b1ecc9dc539ed8bccfc8cb4d2732046227b09d6f37582ff12e50a5047ceb17e
   bootsnap (1.24.6) sha256=c60bab88c70332290f0a2636a288f675299eb4f804a02a3c085b42eca9da164a
-  brakeman (8.0.5) sha256=03735f9690d3fd4b32d66aacbf0a6d15a84266bdd06b32c05c8ecc8f6021d2be
+  brakeman (8.1.0) sha256=cfa9e5214e4925842f4bc849a64f8a7e6c5d0425fe98eac8d7b7bc60fdc17e07
   builder (3.3.0) sha256=497918d2f9dca528fdca4b88d84e4ef4387256d984b8154e9d5d3fe5a9c8835f
   bundler-audit (0.9.3) sha256=81c8766c71e47d0d28a0f98c7eed028539f21a6ea3cd8f685eb6f42333c9b4e9
   concurrent-ruby (1.3.8) sha256=b2f1be836e968ccc78ccfce277ea79c72a88633f22306782c16ff23fb415d1e1
@@ -397,7 +398,7 @@ CHECKSUMS
   nokogiri (1.19.4-x86_64-linux-musl) sha256=17dfb7c1fa194ae02fbf7c51a7afc8d278045ab3fdacfd86f91d02d7b274470b
   paper_trail (17.0.0) sha256=1c2842061d3874ca7015908e821e2aa14f9b982af2acb2a7974713bf79021c85
   paper_trail-association_tracking (2.3.0) sha256=1948c6842a01d12800ccce83cc840d862be021df1f6edbaeaf2899f0f840f2e6
-  paper_trail_diff (0.13.1) sha256=a78733452c369ad9a81bd1f344cbee6e6129e1cc98b0cfed49a3e3b74d84e8dd
+  paper_trail_diff (0.15.0) sha256=f250fed162692b3b08a1ea6d89790e760ead2d4618f6aaaa4830a255fe90dbaa
   parallel (2.1.0) sha256=b35258865c2e31134c5ecb708beaaf6772adf9d5efae28e93e99260877b09356
   parser (3.3.12.0) sha256=21a6d7f755d5a24dfbdc6e6b772e4e879a52e7631a88bc5a3a134606052c9828
   pp (0.6.4) sha256=dfcb0fce700c41456265922884f9fe195d7fbb0674a3578e6c0f69588e82b570

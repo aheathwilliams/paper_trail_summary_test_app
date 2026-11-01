@@ -1,6 +1,14 @@
 class DemoHistory
   class << self
+    # Seeds through VersionClock, so a host clock that steps backwards cannot
+    # reorder the history it writes.
     def create!
+      VersionClock.monotonic { seed! }
+    end
+
+    private
+
+    def seed!
       clear!
 
       article = as("Maya Chen") do
@@ -63,8 +71,11 @@ class DemoHistory
         )
       end
       as("Maya Chen") { article.tags << [ apollo_tag, removed_tag ] }
-      article.reload
       as("Maya Chen") { association_checkpoint!(article) }
+      # PT-AT never forgets the tag changes an instance made, not even on
+      # `reload`, and records the membership from before them at each later
+      # save. Every save after this one comes from a freshly loaded article.
+      article = Article.find(article.id)
 
       as("Maya Chen") do
         article.update!(
@@ -134,7 +145,7 @@ class DemoHistory
       end
       as("Maya Chen") do
         apollo_tag.update!(description: "Reporting on Apollo history and its cultural legacy.")
-        article.tags.delete(removed_tag)
+        tag_change!(article) { article.tags.delete(removed_tag) }
       end
       verified_tag = as("Priya Shah") do
         Tag.create!(
@@ -142,8 +153,8 @@ class DemoHistory
           description: "Major factual claims have supporting sources."
         )
       end
-      as("Priya Shah") { article.tags << verified_tag }
-      article.reload
+      as("Priya Shah") { tag_change!(article) { article.tags << verified_tag } }
+      article = Article.find(article.id)
 
       as("Maya Chen") do
         article.update!(
@@ -225,8 +236,6 @@ class DemoHistory
       article.reload
     end
 
-    private
-
     def as(person, &block)
       PaperTrail.request(whodunnit: person, &block)
     end
@@ -234,6 +243,15 @@ class DemoHistory
     def association_checkpoint!(article)
       fresh_article = Article.find(article.id)
       Article.transaction { fresh_article.paper_trail.save_with_version }
+    end
+
+    # Tag membership is recorded only at article versions, and a change between
+    # two of them is credited to the step after the earlier one. Checkpoints on
+    # both sides make that step the actor's, as TaggingsController does.
+    def tag_change!(article)
+      association_checkpoint!(article)
+      yield
+      association_checkpoint!(article)
     end
 
     def clear!
